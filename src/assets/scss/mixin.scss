@@ -1,0 +1,11 @@
+@mixin flex-between-middle($wrap: wrap, $justify-content: space-between, $align-items: center, $align-content: space-around) {
+  display: flex;
+  // nowrap | wrap
+  flex-wrap: $wrap;
+  // 项目在主轴上的对齐方式 flex-start | flex-end | center | space-between | space-around
+  justify-content: $justify-content;
+  // 项目在交叉轴上的对齐方式 flex-start | flex-end | center | baseline | stretch
+  align-items: $align-items;
+  // 多根轴线的对齐方式 flex-start | flex-end | center | space-between | space-around | stretch
+  align-content: $align-content;
+}

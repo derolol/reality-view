@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="280" viewBox="0 0 200 280" fill="none">
+  <path id="1" fill-rule="evenodd" style="fill:#D1BFFF" transform="translate(0 0)  rotate(0 80 80)" opacity="1" d="M0,160L160,0L40,0L40,40L0,40L0,160Z " />
+  <path id="2" fill-rule="evenodd" style="fill:#6949B8" transform="translate(33 0)  rotate(0 80 40)" opacity="1" d="M160,80L80,0L0,80L160,80Z " />
+  <path id="3" fill-rule="evenodd" style="fill:#7948EA" transform="translate(120 40)  rotate(0 40 40)" opacity="1" d="M0,0L0,40L40,40L0,80L80,80L80,0L0,0Z " />
+  <path id="4" fill-rule="evenodd" style="fill:#6949B8" transform="translate(0 120)  rotate(0 80 80)" opacity="1" d="M80,40L80,0L0,0L0,160L160,0L120,0L80,40Z " />
+  <path id="5" fill-rule="evenodd" style="fill:#9477D9" transform="translate(120 120)  rotate(0 40 80)" opacity="1" d="M0,80L80,160L80,80L0,0L0,80Z " />
+</svg>
