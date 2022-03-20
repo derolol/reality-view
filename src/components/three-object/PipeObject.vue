@@ -1,4 +1,8 @@
-<template></template>
+<template>
+  <div>
+    <slot />
+  </div>
+</template>
 
 <script>
 export default {
@@ -6,6 +10,14 @@ export default {
   props: {},
   data() {
     return {};
+  },
+  created() {
+    console.log("pipe");
+  },
+  methods: {
+    addObjects(scene) {
+      console.log("start pipe add objects");
+    },
   },
 };
 </script>

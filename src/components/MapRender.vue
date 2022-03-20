@@ -36,17 +36,21 @@ export default {
     },
   },
   created() {
-    this.mapRenderPrepare();
-    this.mapRenderAction();
+    console.log("map render");
   },
   mounted() {
+    this.mapRenderPrepare();
     this.addObjects();
+    this.mapRenderAction();
   },
   methods: {
     addObjects() {
+      console.log("start render add objects");
+      if (!this.$slots.default) return;
       for (let el of this.$slots.default) {
-        let tag = el.componentOptions.tag;
-        if (tag === "building-object") {
+        const tag = el.componentOptions.tag;
+        if (tag === "map-object") {
+          el.componentInstance.addObjects(this.mapScene);
         }
       }
     },
@@ -134,28 +138,7 @@ export default {
       // this.mapScene.add(new THREE.CameraHelper(this.mapPerspectiveCamera));
       this.mapScene.add(new THREE.CameraHelper(this.mapOrthographicCamera));
       this.mapScene.add(new THREE.AxesHelper(300));
-      let shape = new THREE.Shape();
-      shape.moveTo(0, 0); //起点
-      shape.lineTo(0, 30); //第2点
-      shape.lineTo(24, 14); //第3点
-      shape.lineTo(24, 0); //第4点
-      shape.lineTo(0, 0); //第5点
-      shape.moveTo(-20, -20);
-      shape.lineTo(-20, -40);
-      shape.lineTo(-40, -40);
-      shape.lineTo(-20, -20);
 
-      var geometry = new THREE.ExtrudeGeometry(shape, {
-        amount: 10, //拉伸长度
-        bevelEnabled: false, //无倒角
-      });
-      var material = new THREE.MeshPhongMaterial({
-        color: 0x81a5ed,
-        specular: 0x444444, //高光部分的颜色
-        shininess: 20, //高光部分的亮度，默认30
-      }); //材质对象
-      var mesh = new THREE.Mesh(geometry, material); //点模型对象
-      this.mapScene.add(mesh);
       const cube = new THREE.Mesh(
         new THREE.BoxGeometry(100, 100, 5),
         new THREE.MeshBasicMaterial({
