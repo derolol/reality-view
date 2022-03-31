@@ -9,15 +9,28 @@ export default {
   name: "poiObject",
   props: {},
   data() {
-    return {};
+    return {
+      scene: null,
+      poiGeometry: null,
+      poiMaterial: [],
+      poiMesh: null,
+    };
   },
   created() {
-    console.log("poi");
+    this.initPOIGeometry();
+    this.initPOIMaterial();
+    this.initPOIMesh();
   },
   methods: {
-    addObjects(scene) {
-      console.log("start pipe add objects");
+    setScene(scene) {
+      this.scene = scene;
     },
+    getPOIObject() {
+      return this.poiMesh;
+    },
+    initPOIGeometry() {},
+    initPOIMaterial() {},
+    initPOIMesh() {},
   },
 };
 </script>

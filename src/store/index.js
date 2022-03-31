@@ -11,6 +11,8 @@ export default new Vuex.Store({
     currentUser: null, // 登录状态
     currentUserImagePath: null, // 用户头像存储目录
     currentInfo: null, // 用户信息
+    mapPreviewBasePath: data.Server + "static/preview/", // 地图预览基路径
+    mapObjectRefs: null,
   },
   getters: {
     getActiveItem(state) {
@@ -25,7 +27,10 @@ export default new Vuex.Store({
       state.currentUser = userInfo.user_name;
       state.currentUserImagePath = data.Server + "static/profile/" + userInfo.user_image_path;
       state.currentInfo = Object.assign({}, userInfo);
-    }
+    },
+    initMapObjectRefs(state, refs) {
+      state.mapObjectRefs = refs;
+    },
   },
   actions: {
   },

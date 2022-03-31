@@ -9,8 +9,9 @@ module.exports = defineConfig({
   configureWebpack: {
     // cdn资源引入配置
     externals: {
-      vue: 'Vue',
+      'vue': 'Vue',
       'element-ui': 'ELEMENT',
+      'vue-konva': 'VueKonva',
     },
   },
   // scss全局配置
@@ -25,11 +26,15 @@ module.exports = defineConfig({
     // 已有配置排除掉svg
     config
       .module.rule("svg")
-      .exclude.add(resolve('src/assets/svg'));
+      .exclude.add(resolve('src/assets/svg'))
+      .add(resolve('src/assets/svg/palette'))
+      .add(resolve('src/assets/svg/object'));
     //配置svg
     config
       .module.rule('icons').test(/\.svg$/)
-      .include.add(resolve('src/assets/svg')).end()
+      .include.add(resolve('src/assets/svg'))
+      .add(resolve('src/assets/svg/palette'))
+      .add(resolve('src/assets/svg/object')).end()
       .use('svg-sprite-loader')
       .loader('svg-sprite-loader')
       .options({ symbolId: 'icon-[name]' })

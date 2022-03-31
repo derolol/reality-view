@@ -3,6 +3,11 @@ import VueRouter from 'vue-router'
 import api from '@/request/user'
 import store from '@/store'
 
+const originalReplace = VueRouter.prototype.replace;
+VueRouter.prototype.replace = function push(location) {
+  return originalReplace.call(this, location).catch(err => err);
+}
+
 Vue.use(VueRouter)
 
 const routes = [
@@ -47,12 +52,17 @@ const routes = [
   {
     path: '/workspace',
     name: 'workspace',
-    component: () => import('@/views/editor/FullScreen.vue'),
+    component: () => import('@/views/editor/WorkSpace.vue'),
     children: [
       {
         path: 'maps/:id/editor',
         name: 'mapEditor',
         component: () => import('@/views/editor/MapEditor.vue'),
+      },
+      {
+        path: 'palette',
+        name: 'palette',
+        component: () => import('@/components/palette/CanvasPalette.vue'),
       },
     ]
   }
@@ -74,8 +84,15 @@ router.beforeEach(async (to, from, next) => {
       return;
     }
   }
+  // 重新设置用户信息到 Vuex 中
   const userInfo = JSON.parse(localStorage.getItem("reality_user_info"));
   store.commit("setUser", userInfo);
+  if (from.name === "mapEditor" && !from.meta.allowNext) {
+    router.replace(from);
+    from.meta.saveData(320, 200);
+    from.meta.to = to;
+    return;
+  }
   next();
 })
 

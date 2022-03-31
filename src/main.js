@@ -4,8 +4,7 @@ import router from './router'
 import store from './store'
 import '../theme/index.css'
 import './assets/svg/index'
-
-Vue.config.productionTip = false
+import 'animate.css';
 
 new Vue({
   router,

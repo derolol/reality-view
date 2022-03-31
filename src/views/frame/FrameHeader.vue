@@ -13,7 +13,7 @@
         <svg-icon
           slot="prefix"
           iconName="search"
-          iconStyle="bar-sign-search-icon"
+          iconClass="bar-sign-search-icon"
         />
       </el-input>
     </div>
@@ -111,7 +111,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scrope>
+<style lang="scss" scoped>
 .bar {
   padding: 30px 80px;
   @include flex-between-middle;
@@ -189,7 +189,7 @@ export default {
   border-radius: 20px;
 }
 
-.bar-sign .bar-sign-search .el-input__prefix {
+.bar-sign-search ::v-deep .el-input__prefix {
   @include flex-between-middle($justify-content: flex-start);
 }
 

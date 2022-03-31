@@ -11,7 +11,7 @@
       </div>
       <div class="login-card-right">
         <div class="sign">
-          <svg-icon iconName="logo" iconStyle="sign-logo" />
+          <svg-icon iconName="logo" iconClass="sign-logo" />
           <div class="sign-title">Reality</div>
         </div>
         <el-form class="login-form" label-width="58px">
@@ -19,7 +19,7 @@
             <span slot="label" class="login-form-item-label"
               ><svg-icon
                 iconName="user"
-                iconStyle="login-form-item-label-icon"
+                iconClass="login-form-item-label-icon"
               />账号</span
             >
             <el-input v-model="userName" />
@@ -28,7 +28,7 @@
             <span slot="label" class="login-form-item-label"
               ><svg-icon
                 iconName="lock"
-                iconStyle="login-form-item-label-icon"
+                iconClass="login-form-item-label-icon"
               />密码</span
             >
             <el-input v-model="userPassword" type="password" />
@@ -55,13 +55,13 @@
               <span class="third-option"
                 ><svg-icon
                   iconName="wechat"
-                  iconStyle="login-option-icon"
+                  iconClass="login-option-icon"
                 />第三方登录</span
               >
               <span class="forget-option"
                 ><svg-icon
                   iconName="info"
-                  iconStyle="login-option-icon"
+                  iconClass="login-option-icon"
                 />忘记密码</span
               >
             </div>

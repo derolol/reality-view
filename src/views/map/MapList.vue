@@ -2,17 +2,29 @@
   <div class="map-list">
     <div class="map-list-header">
       <div>
-        <el-button type="primary" @click="createMapDialogVisible = true"
-          >创建地图</el-button
-        >
+        <el-button type="primary" @click="createMap">创建地图</el-button>
         <el-button @click="importDialogVisible = true">导入地图</el-button>
       </div>
       <el-input class="header-search" placeholder="搜索地图"
         ><svg-icon
           slot="prefix"
           iconName="search"
-          iconStyle="header-search-icon"
+          iconClass="header-search-icon"
       /></el-input>
+    </div>
+    <div class="map-list-container">
+      <el-row :gutter="20">
+        <el-col :span="6" v-for="map in mapList" :key="'map-card' + map.map_id">
+          <map-card
+            :imagePath="map.map_preview_path"
+            :mapInfo="map"
+            @getMapList="getMapList"
+          ></map-card>
+        </el-col>
+        <el-col :span="6">
+          <map-card newMap @click.native="createMap"></map-card>
+        </el-col>
+      </el-row>
     </div>
 
     <!-- 
@@ -20,7 +32,11 @@
       创建地图
       
     -->
-    <el-dialog title="创建地图" :visible.sync="createMapDialogVisible">
+    <el-dialog
+      title="创建地图"
+      :visible.sync="createMapDialogVisible"
+      :before-close="handleCreateMapClose"
+    >
       <el-form class="create-map-form" label-width="100px">
         <el-form-item label="地图名称">
           <el-input
@@ -49,7 +65,22 @@
           </el-select>
         </el-form-item>
         <el-form-item label="地图关联建筑">
-          <el-button size="medium" @click="createBuilding">新增建筑</el-button>
+          <el-tooltip
+            :content="
+              mapBuildingUpdated ? '点击修改建筑' : '点击为地图添加建筑'
+            "
+            placement="top"
+          >
+            <el-button size="medium" @click="createBuilding">
+              <div class="create-map-building">
+                <svg-icon
+                  :iconName="mapBuildingUpdated ? 'edit' : 'plus'"
+                  iconClass="btn-icon"
+                />
+                <span>{{ mapBuildingUpdated ? "修改建筑" : "创建建筑" }}</span>
+              </div>
+            </el-button>
+          </el-tooltip>
         </el-form-item>
         <el-form-item label="地图访问级别">
           <div class="map-access-level">
@@ -76,10 +107,8 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button @click="createMapDialogVisible = false">取 消</el-button>
-        <el-button type="primary" @click="createMapDialogVisible = false"
-          >确 定</el-button
-        >
+        <el-button @click="cancelCreateMap">取 消</el-button>
+        <el-button type="primary" @click="confirmCreateMap">确 定</el-button>
       </div>
     </el-dialog>
 
@@ -88,7 +117,11 @@
       创建建筑
 
     -->
-    <el-dialog title="创建建筑" :visible.sync="createBuildingDialogVisible">
+    <el-dialog
+      title="创建建筑"
+      :visible.sync="createBuildingDialogVisible"
+      :before-close="handleCreateBuildingClose"
+    >
       <el-form class="create-building-form" label-width="100px">
         <el-form-item label="建筑名称">
           <el-input
@@ -105,33 +138,33 @@
             size="medium"
           >
             <el-option-group
-              v-for="typeList in buildingTypeList"
-              :key="typeList.label"
-              :label="typeList.label"
+              v-for="group in buildTypeGroupList"
+              :key="group.label"
+              :label="group.label"
             >
               <el-option
-                v-for="type in typeList.options"
-                :key="type"
-                :label="type"
-                :value="type"
+                v-for="type in group.types"
+                :key="type.no"
+                :label="type.option"
+                :value="type.no"
               />
             </el-option-group>
           </el-select>
         </el-form-item>
         <el-form-item label="建筑中心">
           <div class="building-center">
-            <span class="building-center-label">经度</span>
             <el-input
               v-model="createBuildingModel.buildingCenterLng"
-              type="number"
               size="medium"
-            />
-            <span class="building-center-label building-center-lat">纬度</span>
+            >
+              <span class="input-text-prefix" slot="prefix">经度:</span>
+            </el-input>
             <el-input
               v-model="createBuildingModel.buildingCenterLat"
-              type="number"
               size="medium"
-            />
+            >
+              <span class="input-text-prefix" slot="prefix">纬度:</span>
+            </el-input>
             <el-button size="medium" type="success" class="building-center-btn"
               >获取中心经纬度</el-button
             >
@@ -140,12 +173,28 @@
         <el-form-item label="建筑楼层高度">
           <el-input
             v-model="createBuildingModel.buildingFloorHeight"
-            type="number"
             size="medium"
+            @blur="handleBuildingFloorHeightChange"
           />
         </el-form-item>
         <el-form-item label="建筑轮廓">
-          <el-button type="primary" size="medium">建筑轮廓绘制</el-button>
+          <div class="building-geometry-container">
+            <v-stage
+              ref="stage"
+              :config="stageConfig"
+              class="building-geometry-stage"
+            >
+              <v-layer>
+                <v-shape ref="shape" :config="buildingGeometryConfig" />
+              </v-layer>
+            </v-stage>
+            <el-button
+              type="primary"
+              size="medium"
+              @click="handleBuildingGeometryPaint"
+              >建筑轮廓绘制</el-button
+            >
+          </div>
         </el-form-item>
         <el-form-item label="建筑访问级别">
           <div class="building-access-level">
@@ -202,58 +251,155 @@
 
 <script>
 import data from "@/store/data";
+import request from "@/request/editor";
+import MapCard from "./MapCard.vue";
 export default {
-  name: "map-list",
+  name: "mapList",
+  components: { MapCard },
   data() {
     return {
+      mapList: [],
+
       accessLevel: data.MapAccessLevelList,
 
       createMapDialogVisible: false,
-      mapTags: ["室内", "大型商场", "停车场", "医院", "学校", "游戏", "景点"],
+      mapTags: data.MapTagList,
       createMapModel: {
         mapName: "",
         mapTags: [],
         mapAttachBuilding: [],
         mapAccessLevel: 1,
       },
+      mapBuildingUpdated: false,
 
       createBuildingDialogVisible: false,
-      buildingTypeList: [
-        {
-          label: "商业建筑",
-          options: ["商场", "写字楼", "超市", "菜市场", "停车场"],
-        },
-        {
-          label: "便民建筑",
-          options: [
-            "医院",
-            "学校",
-            "图书馆",
-            "科技馆",
-            "火车站",
-            "飞机场",
-            "公园",
-            "银行",
-          ],
-        },
-        {
-          label: "居住建筑",
-          options: ["住宅", "酒店"],
-        },
-      ],
+      buildTypeGroupList: this.BuildingType,
       createBuildingModel: {
         buildingName: "",
         buildingType: "",
         buildingCenterLng: 0,
         buildingCenterLat: 0,
         buildingFloorHeight: 3,
+        buildingGeometry: [],
         buildingAccessLevel: 1,
+      },
+      stageConfig: {
+        width: 100,
+        height: 60,
+      },
+      buildingGeometryConfig: {
+        sceneFunc: () => {},
+        stroke: "#9477D9",
+        strokeWidth: 2,
+        name: "shape",
+        strokeScaleEnabled: false, // 缩放不影响描边粗细
       },
 
       importDialogVisible: false,
+
+      alreadyCreated: false,
+      autoSaveDataTimer: null,
     };
   },
+  watch: {
+    createMapDialogVisible() {
+      this.$router.replace({
+        query: {
+          map: this.createMapDialogVisible,
+          building: this.createBuildingDialogVisible,
+        },
+      });
+    },
+    createBuildingDialogVisible() {
+      this.$router.replace({
+        query: {
+          map: this.createMapDialogVisible,
+          building: this.createBuildingDialogVisible,
+        },
+      });
+    },
+  },
+  created() {
+    this.getMapList();
+    this.rebuildPageData();
+    this.alreadyCreated = true;
+    this.autoSaveDataTimer = setInterval(() => {
+      this.saveDataLocal();
+    }, 2000);
+  },
+  activated() {
+    if (this.alreadyCreated) return;
+    this.rebuildPageData();
+  },
+  deactivated() {
+    this.saveDataLocal();
+    if (this.autoSaveDataTimer) {
+      clearInterval(this.autoSaveDataTimer);
+    }
+  },
+  destroyed() {
+    this.saveDataLocal();
+    if (this.autoSaveDataTimer) {
+      clearInterval(this.autoSaveDataTimer);
+    }
+  },
   methods: {
+    /**
+     * 获取所有地图
+     */
+    async getMapList() {
+      const maps = await request.getMapList();
+      if (maps.code !== 200 || typeof maps.data.maps !== "object") {
+        this.$message.error("获取地图列表失败");
+        return;
+      }
+      this.mapList.splice(0, this.mapList.length, ...maps.data.maps);
+    },
+    /**
+     * 创建建筑实体
+     */
+    async createMapObject() {
+      let mapInfo = {
+        map_name: this.createMapModel.mapName,
+        map_tag: JSON.stringify(this.createMapModel.mapTags),
+        map_attach_building: JSON.stringify([]),
+        map_owner: this.$store.state.currentInfo.user_id,
+        map_access_level: this.createMapModel.mapAccessLevel,
+      };
+      console.log(mapInfo);
+      const map = await request.createMap(mapInfo);
+      if (map.code !== 200) {
+        throw Error(`创建地图失败:${map.message}`);
+      }
+      let mapRes = map.data.map;
+      let mapId = mapRes !== null ? mapRes.map_id : -1;
+      let buildingInfo = {
+        building_name: this.createBuildingModel.buildingName,
+        building_type: this.createBuildingModel.buildingType,
+        building_center_lng: this.createBuildingModel.buildingCenterLng,
+        building_center_lat: this.createBuildingModel.buildingCenterLat,
+        building_floor_height: this.createBuildingModel.buildingFloorHeight,
+        building_geometry: JSON.stringify({
+          type: "Polygon",
+          coordinates: [this.createBuildingModel.buildingGeometry],
+        }),
+        building_belong_map: mapId,
+        building_attach_floor: JSON.stringify([]),
+        building_owner: this.$store.state.currentInfo.user_id,
+        building_access_level: this.createBuildingModel.buildingAccessLevel,
+      };
+      console.log(buildingInfo);
+      const building = await request.createBuilding(buildingInfo);
+      if (building.code !== 200) {
+        console.log(building);
+        throw Error(`创建建筑失败:${building.message}`);
+      }
+      this.$message.info("创建地图成功");
+      this.mapList.push(map);
+    },
+    /**
+     * 创建标签时判断标签个数
+     */
     createMapTagChange() {
       let len = this.createMapModel.mapTags.length;
       if (len > 5) {
@@ -261,23 +407,257 @@ export default {
         this.$message.info({ message: "仅限选择5个标签" });
       }
     },
+    /**
+     * 显示创建地图对话框
+     */
+    createMap() {
+      this.createMapDialogVisible = true;
+    },
+    /**
+     * 显示创建建筑对话框
+     */
     createBuilding() {
       this.createMapDialogVisible = false;
       this.createBuildingDialogVisible = true;
     },
+    /**
+     * 取消创建地图
+     */
+    cancelCreateMap() {
+      this.createMapDialogVisible = false;
+      this.mapBuildingUpdated = false;
+      this.initMapData();
+      this.initBuildingData();
+    },
+    /**
+     * 确认创建地图
+     */
+    confirmCreateMap() {
+      this.createMapObject()
+        .then(() => {
+          this.createMapDialogVisible = false;
+          this.mapBuildingUpdated = false;
+          this.initMapData();
+          this.initBuildingData();
+        })
+        .catch((err) => {
+          console.error(err);
+          this.$message.error("创建地图失败，请重试!");
+        });
+    },
+    /**
+     * 取消创建建筑
+     */
     cancelCreateBuilding() {
       this.createBuildingDialogVisible = false;
       this.createMapDialogVisible = true;
+      this.mapBuildingUpdated = false;
+      this.initBuildingData();
     },
+    /**
+     * 确认创建建筑
+     */
     confirmCreateBuilding() {
       this.createBuildingDialogVisible = false;
       this.createMapDialogVisible = true;
+      this.mapBuildingUpdated = true;
     },
+    /**
+     * 当创建地图窗口被关闭时阻塞处理
+     */
+    handleCreateMapClose(done) {
+      this.$confirm("确认关闭窗口？（数据将不会被保存）")
+        .then(() => {
+          this.mapBuildingUpdated = false;
+          this.initMapData();
+          this.initBuildingData();
+          done();
+        })
+        .catch(() => {});
+    },
+    /**
+     * 当创建建筑窗口被关闭时阻塞处理
+     */
+    handleCreateBuildingClose(done) {
+      this.$confirm("确认关闭窗口？（数据将不会被保存）")
+        .then(() => {
+          this.mapBuildingUpdated = false;
+          this.initBuildingData();
+          done();
+        })
+        .catch(() => {});
+    },
+    /**
+     * 跳转到画板页面
+     * 绘制建筑轮廓
+     */
+    handleBuildingGeometryPaint() {
+      this.$router.push({ name: "palette" });
+    },
+    /**
+     * 根据当前获取的绘制点
+     * 绘制轮廓形状预览图
+     */
+    setBuildingGeometryConfig() {
+      const showWidth = this.stageConfig.width;
+      const showHeight = this.stageConfig.height;
+      const centerX = showWidth / 2;
+      const centerY = showHeight / 2;
+      // 获取形状的外包矩形
+      let minX = Number.MAX_SAFE_INTEGER;
+      let minY = Number.MAX_SAFE_INTEGER;
+      let maxX = Number.MIN_SAFE_INTEGER;
+      let maxY = Number.MIN_SAFE_INTEGER;
+      for (
+        let i = 0, len = this.createBuildingModel.buildingGeometry.length;
+        i < len;
+        i++
+      ) {
+        let x = this.createBuildingModel.buildingGeometry[i][0];
+        let y = this.createBuildingModel.buildingGeometry[i][1];
+        minX = x < minX ? x : minX;
+        minY = y < minY ? y : minY;
+        maxX = x > maxX ? x : maxX;
+        maxY = y > maxY ? y : maxY;
+      }
+      let r = { x: minX, y: minY, width: maxX - minX, height: maxX - minY };
+      // 计算形状需要缩放的大小
+      let scaleX = showWidth / r.width;
+      let scaleY = showHeight / r.height;
+      const scale = scaleX < scaleY ? scaleX : scaleY;
+      this.buildingGeometryConfig = Object.assign(
+        {},
+        this.buildingGeometryConfig,
+        {
+          sceneFunc: (context, shape) => {
+            context.beginPath();
+            for (
+              let i = 0, len = this.createBuildingModel.buildingGeometry.length;
+              i < len;
+              i++
+            ) {
+              let x = this.createBuildingModel.buildingGeometry[i][0];
+              let y = -this.createBuildingModel.buildingGeometry[i][1];
+              if (i === 0) context.moveTo(x, y);
+              context.lineTo(x, y);
+            }
+            context.closePath();
+            context.fillStrokeShape(shape);
+          },
+          offsetX: -centerX,
+          offsetY: -centerY,
+          scale,
+        }
+      );
+    },
+    /**
+     * 当用户修改input时触发数据保存到本地
+     */
+    saveDataLocal() {
+      localStorage.setItem(
+        "reality-maps-create-map-model",
+        JSON.stringify(this.createMapModel)
+      );
+      localStorage.setItem(
+        "reality-maps-create-building-model",
+        JSON.stringify(this.createBuildingModel)
+      );
+      localStorage.setItem("reality-maps-map", this.createMapDialogVisible);
+      localStorage.setItem(
+        "reality-maps-building",
+        this.createBuildingDialogVisible
+      );
+    },
+    /**
+     * 初始化地图数据
+     */
+    initMapData() {
+      this.createMapModel = Object.assign(
+        {},
+        {
+          mapName: "",
+          mapTags: [],
+          mapAttachBuilding: [],
+          mapAccessLevel: 1,
+        }
+      );
+      localStorage.setItem(
+        "reality-maps-create-map-model",
+        JSON.stringify(this.createMapModel)
+      );
+    },
+    /**
+     * 初始化建筑数据
+     */
+    initBuildingData() {
+      this.createBuildingModel = Object.assign(
+        {},
+        {
+          buildingName: "",
+          buildingType: "",
+          buildingCenterLng: 0,
+          buildingCenterLat: 0,
+          buildingFloorHeight: 3,
+          buildingGeometry: [],
+          buildingAccessLevel: 1,
+        }
+      );
+      localStorage.setItem(
+        "reality-maps-create-building-model",
+        JSON.stringify(this.createBuildingModel)
+      );
+    },
+    rebuildPageData() {
+      // 控制对话框的显示及隐藏
+      let showCreateMap = localStorage.getItem("reality-maps-map");
+      let showCreateBuilding = localStorage.getItem("reality-maps-building");
+      // 创建地图对话框
+      if (showCreateMap !== null) {
+        if (typeof showCreateMap === "string") {
+          this.createMapDialogVisible = showCreateMap === "true";
+        } else if (typeof showCreateMap === "boolean") {
+          this.createMapDialogVisible = showCreateMap;
+        }
+      }
+      // 创建建筑对话框
+      if (showCreateBuilding !== null) {
+        if (typeof showCreateBuilding === "string") {
+          this.createBuildingDialogVisible = showCreateBuilding === "true";
+        } else if (typeof showCreateMap === "boolean") {
+          this.createBuildingDialogVisible = showCreateBuilding;
+        }
+      }
+      // 若本地存储数据则恢复本地地图数据
+      let mapInfo = localStorage.getItem("reality-maps-create-map-model");
+      if (mapInfo) {
+        this.createMapModel = JSON.parse(mapInfo);
+      }
+      // 若本地存储数据则恢复本地建筑数据
+      let buildingInfo = localStorage.getItem(
+        "reality-maps-create-building-model"
+      );
+      if (buildingInfo) {
+        this.createBuildingModel = JSON.parse(buildingInfo);
+      }
+      // 获取完成绘制的轮廓
+      let points = this.$route.params.points;
+      if (points !== null && typeof points === "object" && points.length > 0) {
+        this.createBuildingModel.buildingGeometry.splice(
+          0,
+          this.createBuildingModel.buildingGeometry.length,
+          ...points
+        );
+        this.$nextTick(() => {
+          this.setBuildingGeometryConfig();
+        });
+      }
+    },
+    handleBuildingFloorHeightChange() {},
   },
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .map-list-header {
   @include flex-between-middle;
   margin-bottom: 20px;
@@ -287,7 +667,7 @@ export default {
   width: 300px;
 }
 
-.header-search .el-input__prefix {
+.header-search ::v-deep .el-input__prefix {
   @include flex-between-middle($justify-content: flex-start);
 }
 
@@ -315,29 +695,98 @@ export default {
   width: 100%;
 }
 
+.create-map-form .create-map-building {
+  @include flex-between-middle($justify-content: flex-start);
+}
+
+.create-map-form .create-map-building .btn-icon {
+  margin-left: -3px;
+  margin-right: 5px;
+  width: 17px;
+  height: 17px;
+}
+
 .create-building-form .building-type-select {
   width: 100%;
 }
 
 .create-building-form .building-center {
-  @include flex-between-middle($wrap: nowrap);
+  @include flex-between-middle($justify-content: space-between, $wrap: nowrap);
 }
 
-.create-building-form .building-center .building-center-label {
-  display: inline-block;
-  margin-right: 5px;
-  width: 40px;
+.create-building-form .building-center .input-text-prefix {
+  padding: 0 10px;
 }
 
-.create-building-form .building-center .building-center-lat {
-  margin-left: 10px;
+.building-center .el-input--prefix ::v-deep .el-input__inner {
+  padding-left: 55px;
 }
 
 .create-building-form .building-center .el-input {
-  width: auto;
+  margin-right: 10px;
 }
 
-.create-building-form .building-center .building-center-btn {
-  margin-left: 10px;
+.create-building-form .building-geometry-stage {
+  border: 1px solid $--color-disabled;
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.create-building-form .building-geometry-container {
+  @include flex-between-middle(
+    $justify-content: flex-start,
+    $align-items: flex-end
+  );
+}
+
+// 为对话框提供动画
+.map-list ::v-deep .el-dialog__wrapper {
+  transition-duration: 0.3s;
+}
+
+.dialog-fade-enter-active {
+  animation: none !important;
+}
+.dialog-fade-leave-active {
+  transition-duration: 0.15s !important;
+  animation: none !important;
+}
+
+.dialog-fade-enter-active ::v-deep .el-dialog,
+dialog-fade-leave-active ::v-deep .el-dialog {
+  animation-fill-mode: forwards;
+}
+
+.dialog-fade-enter-active ::v-deep .el-dialog {
+  animation-duration: 0.3s;
+  animation-name: anim-open;
+  animation-timing-function: cubic-bezier(0.6, 0, 0.4, 1);
+}
+
+.dialog-fade-leave-active ::v-deep .el-dialog {
+  animation-duration: 0.3s;
+  animation-name: anim-close;
+}
+
+@keyframes anim-open {
+  0% {
+    opacity: 0;
+    transform: scale3d(0, 0, 1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+@keyframes anim-close {
+  0% {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale3d(0, 0, 1);
+  }
 }
 </style>
