@@ -1,5 +1,5 @@
 <template>
-  <svg :class="style" aria-hidden="true">
+  <svg :class="myClass" :style="myStyle" aria-hidden="true">
     <use :xlink:href="name" />
   </svg>
 </template>
@@ -12,6 +12,9 @@ export default {
       type: String,
       required: true,
     },
+    iconClass: {
+      type: String,
+    },
     iconStyle: {
       type: String,
     },
@@ -20,8 +23,11 @@ export default {
     name() {
       return `#icon-${this.iconName}`;
     },
-    style() {
-      return `svg-icon ${this.iconStyle ? this.iconStyle : ""}`;
+    myClass() {
+      return `svg-icon ${this.iconClass ? this.iconClass : ""}`;
+    },
+    myStyle() {
+      return `${this.iconStyle ? this.iconStyle : ""}`;
     },
   },
 };

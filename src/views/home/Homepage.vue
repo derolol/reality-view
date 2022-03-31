@@ -2,7 +2,7 @@
   <div class="homepage">
     <div class="homepage-stat homepage-module">
       <div class="title">
-        <svg-icon iconName="chart" iconStyle="title-icon" />
+        <svg-icon iconName="chart" iconClass="title-icon" />
         <span class="title-text">数据统计</span>
       </div>
       <div class="number-card homepage-module-content">

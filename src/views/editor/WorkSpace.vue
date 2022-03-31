@@ -6,7 +6,7 @@
 
 <script>
 export default {
-  name: "fullScreen",
+  name: "workSpace",
 };
 </script>
 

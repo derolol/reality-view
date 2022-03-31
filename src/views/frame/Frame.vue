@@ -32,6 +32,7 @@ export default {
 
 .body {
   padding: 50px;
+  min-height: 500px;
 }
 
 .footer {
