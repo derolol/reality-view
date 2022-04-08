@@ -2,7 +2,7 @@
   <div class="bar">
     <div class="bar-sign">
       <div class="bar-sign-logo" @click="jumpHomepage">
-        <svg-icon icon-name="logo" icon-style="bar-sign-logo-icon" />
+        <svg-icon iconName="logo" iconClass="bar-sign-logo-icon" />
       </div>
       <div class="bar-sign-title" @click="jumpHomepage">Reality</div>
       <el-input
@@ -30,7 +30,7 @@
           :index="item.index"
         >
           <span class="menu-item-title">
-            <svg-icon :icon-name="item.icon" icon-style="menu-item-icon" />{{
+            <svg-icon :iconName="item.icon" iconClass="menu-item-icon" />{{
               item.text
             }}
           </span>
@@ -61,7 +61,9 @@
 </template>
 
 <script>
+import SvgText from "@/components/SvgText.vue";
 export default {
+  components: { SvgText },
   name: "header-nav-bar",
   data() {
     return {

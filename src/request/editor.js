@@ -57,6 +57,41 @@ const updateBuilding = async (buildingId, record) => {
   });
 }
 
+const updateFloor = async (floorId, record) => {
+  return instance.request({
+    url: `/${PREFIX}/floors/${floorId}/update`,
+    method: "post",
+    data: record,
+  });
+}
+
+const deleteFloor = async (floorId) => {
+  return instance.request({
+    url: `/${PREFIX}/floors/${floorId}/delete`,
+    method: "post",
+  });
+}
+
+const copyFloor = async (floorId, targetFloorLevel) => {
+  return instance.request({
+    url: `/${PREFIX}/floors/${floorId}/copy`,
+    method: "post",
+    data: {
+      target: targetFloorLevel,
+    }
+  });
+}
+
+const createFloor = async (info) => {
+  return instance.request({
+    url: `/${PREFIX}/floors`,
+    method: "post",
+    data: {
+      info,
+    }
+  });
+}
+
 export default {
   getMapList,
   createMap,
@@ -65,4 +100,8 @@ export default {
   uploadMapPreviewImage,
   deleteMap,
   updateBuilding,
+  updateFloor,
+  deleteFloor,
+  copyFloor,
+  createFloor,
 }

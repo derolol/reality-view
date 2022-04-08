@@ -23,12 +23,18 @@ import "@/assets/svg/setting.svg";
 import "@/assets/svg/question.svg";
 import "@/assets/svg/error.svg";
 import "@/assets/svg/delete.svg";
+import "@/assets/svg/copy.svg";
 
 import "@/assets/svg/palette/line.svg";
 import "@/assets/svg/palette/multi-line.svg";
 import "@/assets/svg/palette/rectangle.svg";
 import "@/assets/svg/palette/polygon.svg";
 import "@/assets/svg/palette/regular-polygon.svg";
+import "@/assets/svg/palette/intersection.svg";
+import "@/assets/svg/palette/union.svg";
+import "@/assets/svg/palette/diff.svg";
+import "@/assets/svg/palette/xor.svg";
+import "@/assets/svg/palette/single.svg";
 
 import "@/assets/svg/object/building.svg";
 import "@/assets/svg/object/wall.svg";

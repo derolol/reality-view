@@ -1,7 +1,13 @@
 <template></template>
 
 <script>
-import { ShapeGeometry, Group, Mesh, MeshLambertMaterial } from "three";
+import {
+  ShapeGeometry,
+  Group,
+  Mesh,
+  MeshLambertMaterial,
+  DoubleSide,
+} from "three";
 import utils from "@/store/utils";
 export default {
   name: "areaObject",
@@ -23,6 +29,7 @@ export default {
   created() {
     this.initAreaGeometry();
     this.initAreaMaterial();
+    this.initAreaGroup();
     this.initAreaMesh();
   },
   computed: {
@@ -46,6 +53,7 @@ export default {
       return this.areaGroup;
     },
     initAreaGeometry() {
+      this.areaGeometry.splice(0, this.areaGeometry.length);
       let shapes = utils.getShape(this.areaInfo.geometry);
       for (let shape of shapes) {
         this.areaGeometry.push(new ShapeGeometry(shape));
@@ -55,11 +63,12 @@ export default {
       this.areaMaterial.push(
         new MeshLambertMaterial({
           color: 0x86e0dd,
+          side: DoubleSide,
         })
       );
     },
     initAreaMesh() {
-      this.areaGroup = new Group();
+      this.areaMesh.splice(0, this.areaMesh);
       for (let i = 0, len = this.areaGeometry.length; i < len; i++) {
         let mesh = new Mesh(
           this.areaGeometry[i],
@@ -69,6 +78,15 @@ export default {
         this.areaMesh.push(mesh);
         this.areaGroup.add(mesh);
       }
+    },
+    initAreaGroup() {
+      this.areaGroup = new Group();
+    },
+    updateAreaGeometry(geometry) {
+      this.areaInfo.geometry = geometry;
+      this.areaGroup.remove(...this.areaMesh);
+      this.initAreaGeometry();
+      this.initAreaMesh();
     },
   },
 };

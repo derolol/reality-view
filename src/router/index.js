@@ -62,7 +62,7 @@ const routes = [
       {
         path: 'palette',
         name: 'palette',
-        component: () => import('@/components/palette/CanvasPalette.vue'),
+        component: () => import('@/components/palette/ShapePalette.vue'),
       },
     ]
   }
@@ -87,7 +87,7 @@ router.beforeEach(async (to, from, next) => {
   // 重新设置用户信息到 Vuex 中
   const userInfo = JSON.parse(localStorage.getItem("reality_user_info"));
   store.commit("setUser", userInfo);
-  if (from.name === "mapEditor" && !from.meta.allowNext) {
+  if (from.name === "mapEditor" && to.name === "maps" && !from.meta.allowNext) {
     router.replace(from);
     from.meta.saveData(320, 200);
     from.meta.to = to;
