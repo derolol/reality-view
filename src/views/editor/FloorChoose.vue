@@ -1,16 +1,16 @@
 <template>
-  <div
-    class="floor-choose animate__animated"
-    :class="{
-      animate__pulse: mouseEnterButton,
-    }"
-    @mouseenter="mouseEnterButton = true"
-    @mouseleave="mouseEnterButton = false"
-  >
+  <div class="floor-choose">
+    <div style="font-size: 20px; color: red"></div>
     <div
-      class="floor-button"
-      :class="{ 'floor-button-active': currentFloor == f }"
-      v-for="f in showFloorList"
+      v-for="(f, index) in showFloorList"
+      :key="'level' + f"
+      class="floor-button animate__animated"
+      :class="{
+        'floor-button-active': currentFloorLevel == f,
+        animate__pulse: animationControl[index],
+      }"
+      @mouseenter="setAnimation(index, true)"
+      @mouseleave="setAnimation(index, false)"
       @click="handleFloorClick(f)"
     >
       <div>{{ f | floorNumberFormat }}</div>
@@ -43,9 +43,31 @@ export default {
     return {
       maxShowFloors: 7,
       mouseEnterButton: false,
+
+      floorLevelToId: {},
+      floorIdToLevel: {},
+
+      animationControl: [],
     };
   },
+  created() {
+    this.animationControl = [...new Array(this.maxShowFloors)].fill(false);
+  },
+  watch: {
+    floors() {
+      for (let i = 0, len = this.floors.length; i < len; i++) {
+        let floor = this.floors[i].properties;
+        let id = floor.floor_id;
+        let level = floor.floor_level;
+        this.floorLevelToId[level] = id;
+        this.floorIdToLevel[id] = level;
+      }
+    },
+  },
   computed: {
+    currentFloorLevel() {
+      return this.floorIdToLevel[this.currentFloor];
+    },
     floorList() {
       let f = [];
       for (let i = 0, len = this.floors.length; i < len; i++) {
@@ -79,7 +101,10 @@ export default {
   methods: {
     handleFloorClick(floor) {
       if (floor === "...") return;
-      this.currentFloor = floor;
+      this.$emit("floorChange", this.floorLevelToId[floor]);
+    },
+    setAnimation(index, status) {
+      this.animationControl.splice(index, 1, status);
     },
   },
 };
@@ -119,7 +144,7 @@ export default {
 }
 
 .floor-choose .floor-button:hover {
-  background-color: #ab77ff;
+  background-color: #9554ff;
   box-shadow: 0px 0px 8px #c29cff;
   cursor: pointer;
 }

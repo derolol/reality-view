@@ -11,6 +11,7 @@
     "axios": "^0.26.1",
     "core-js": "^3.8.3",
     "jsencrypt": "^3.2.1",
+    "martinez-polygon-clipping": "^0.6.2",
     "node-rsa": "^1.1.1",
     "openssl": "^2.0.0",
     "svg-sprite-loader": "^6.0.11",

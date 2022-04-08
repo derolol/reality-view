@@ -41,6 +41,7 @@ export default {
       mapPerspectiveCamera: null,
       mapRenderer: null,
       mapController: null,
+      mapGridHelper: null,
 
       getCanvasImage: false,
       getImageCallback: true,
@@ -52,6 +53,11 @@ export default {
     },
     height() {
       this.mapRenderResize();
+    },
+  },
+  computed: {
+    refs() {
+      return this.$store.state.mapObjectRefs;
     },
   },
   created() {},
@@ -168,9 +174,11 @@ export default {
       // this.mapScene.add(new CameraHelper(this.mapPerspectiveCamera));
       this.mapScene.add(new CameraHelper(this.mapOrthographicCamera));
       this.mapScene.add(new AxesHelper(300));
-      const gridHelper = new GridHelper(200, 50, "#DCDFE6", "#DCDFE6");
-      gridHelper.setRotationFromEuler(new Euler(Math.PI / 2, 0, 0, "XYZ"));
-      this.mapScene.add(gridHelper);
+      this.mapGridHelper = new GridHelper(200, 50, "#DCDFE6", "#DCDFE6");
+      this.mapGridHelper.setRotationFromEuler(
+        new Euler(Math.PI / 2, 0, 0, "XYZ")
+      );
+      this.mapScene.add(this.mapGridHelper);
     },
     mapControllerInit() {
       this.mapController = new OrbitControls(
@@ -205,6 +213,13 @@ export default {
     },
     mapControllerChange() {
       this.$emit("controllerRotation", this.mapController.getAzimuthalAngle());
+    },
+    setGridHelperLevel(x, y, z) {
+      this.mapGridHelper.position.set(x, y, z);
+    },
+    setCameraPosition(x, y, z) {
+      this.mapPerspectiveCamera.position.set(x, y, z + 50);
+      this.mapPerspectiveCamera.lookAt(new Vector3(x, y, z));
     },
   },
   computed: {},

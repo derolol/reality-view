@@ -147,7 +147,7 @@ const BuildingType = {
 
 const ThreeObjectConfig = {
   zScale: 3,
-  floorMargin: 3,
+  floorMargin: 6,
 }
 
 export default {

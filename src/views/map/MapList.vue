@@ -253,6 +253,7 @@
 import data from "@/store/data";
 import request from "@/request/editor";
 import MapCard from "./MapCard.vue";
+import utils from "@/store/utils";
 export default {
   name: "mapList",
   components: { MapCard },
@@ -273,14 +274,14 @@ export default {
       mapBuildingUpdated: false,
 
       createBuildingDialogVisible: false,
-      buildTypeGroupList: this.BuildingType,
+      buildTypeGroupList: data.BuildingType,
       createBuildingModel: {
         buildingName: "",
         buildingType: "",
         buildingCenterLng: 0,
         buildingCenterLat: 0,
         buildingFloorHeight: 3,
-        buildingGeometry: [],
+        buildingGeometry: {},
         buildingAccessLevel: 1,
       },
       stageConfig: {
@@ -366,7 +367,6 @@ export default {
         map_owner: this.$store.state.currentInfo.user_id,
         map_access_level: this.createMapModel.mapAccessLevel,
       };
-      console.log(mapInfo);
       const map = await request.createMap(mapInfo);
       if (map.code !== 200) {
         throw Error(`创建地图失败:${map.message}`);
@@ -379,23 +379,21 @@ export default {
         building_center_lng: this.createBuildingModel.buildingCenterLng,
         building_center_lat: this.createBuildingModel.buildingCenterLat,
         building_floor_height: this.createBuildingModel.buildingFloorHeight,
-        building_geometry: JSON.stringify({
-          type: "Polygon",
-          coordinates: [this.createBuildingModel.buildingGeometry],
-        }),
+        building_geometry: JSON.stringify(
+          this.createBuildingModel.buildingGeometry
+        ),
         building_belong_map: mapId,
         building_attach_floor: JSON.stringify([]),
         building_owner: this.$store.state.currentInfo.user_id,
         building_access_level: this.createBuildingModel.buildingAccessLevel,
       };
-      console.log(buildingInfo);
       const building = await request.createBuilding(buildingInfo);
       if (building.code !== 200) {
-        console.log(building);
+        await request.deleteMap(mapId);
         throw Error(`创建建筑失败:${building.message}`);
       }
       this.$message.info("创建地图成功");
-      this.mapList.push(map);
+      this.mapList.push(map.data.map);
     },
     /**
      * 创建标签时判断标签个数
@@ -492,7 +490,7 @@ export default {
      * 绘制建筑轮廓
      */
     handleBuildingGeometryPaint() {
-      this.$router.push({ name: "palette" });
+      this.$router.push({ name: "palette", params: { drawMode: "building" } });
     },
     /**
      * 根据当前获取的绘制点
@@ -501,52 +499,22 @@ export default {
     setBuildingGeometryConfig() {
       const showWidth = this.stageConfig.width;
       const showHeight = this.stageConfig.height;
-      const centerX = showWidth / 2;
-      const centerY = showHeight / 2;
-      // 获取形状的外包矩形
-      let minX = Number.MAX_SAFE_INTEGER;
-      let minY = Number.MAX_SAFE_INTEGER;
-      let maxX = Number.MIN_SAFE_INTEGER;
-      let maxY = Number.MIN_SAFE_INTEGER;
-      for (
-        let i = 0, len = this.createBuildingModel.buildingGeometry.length;
-        i < len;
-        i++
-      ) {
-        let x = this.createBuildingModel.buildingGeometry[i][0];
-        let y = this.createBuildingModel.buildingGeometry[i][1];
-        minX = x < minX ? x : minX;
-        minY = y < minY ? y : minY;
-        maxX = x > maxX ? x : maxX;
-        maxY = y > maxY ? y : maxY;
-      }
-      let r = { x: minX, y: minY, width: maxX - minX, height: maxX - minY };
-      // 计算形状需要缩放的大小
-      let scaleX = showWidth / r.width;
-      let scaleY = showHeight / r.height;
-      const scale = scaleX < scaleY ? scaleX : scaleY;
+      const box = utils.getShapeBox(
+        this.createBuildingModel.buildingGeometry.coordinates
+      );
+      const scale = utils.getBoxScale(showWidth, showHeight, box) * 0.9;
       this.buildingGeometryConfig = Object.assign(
         {},
         this.buildingGeometryConfig,
         {
-          sceneFunc: (context, shape) => {
-            context.beginPath();
-            for (
-              let i = 0, len = this.createBuildingModel.buildingGeometry.length;
-              i < len;
-              i++
-            ) {
-              let x = this.createBuildingModel.buildingGeometry[i][0];
-              let y = -this.createBuildingModel.buildingGeometry[i][1];
-              if (i === 0) context.moveTo(x, y);
-              context.lineTo(x, y);
-            }
-            context.closePath();
-            context.fillStrokeShape(shape);
-          },
-          offsetX: -centerX,
-          offsetY: -centerY,
-          scale,
+          sceneFunc: utils.generateSceneFunc(
+            this.createBuildingModel.buildingGeometry.coordinates,
+            scale,
+            showWidth,
+            showHeight
+          ),
+          x: -box.x * scale - showWidth / 2 + 0.05 * showWidth,
+          y: -showHeight / 2 + (box.y + box.height) * scale + 0.05 * showHeight,
         }
       );
     },
@@ -598,7 +566,7 @@ export default {
           buildingCenterLng: 0,
           buildingCenterLat: 0,
           buildingFloorHeight: 3,
-          buildingGeometry: [],
+          buildingGeometry: {},
           buildingAccessLevel: 1,
         }
       );
@@ -640,13 +608,13 @@ export default {
         this.createBuildingModel = JSON.parse(buildingInfo);
       }
       // 获取完成绘制的轮廓
-      let points = this.$route.params.points;
-      if (points !== null && typeof points === "object" && points.length > 0) {
-        this.createBuildingModel.buildingGeometry.splice(
-          0,
-          this.createBuildingModel.buildingGeometry.length,
-          ...points
-        );
+      let geometry = this.$route.params.geometry;
+      if (
+        geometry !== null &&
+        typeof geometry === "object" &&
+        geometry.hasOwnProperty("coordinates")
+      ) {
+        this.createBuildingModel.buildingGeometry = Object.assign({}, geometry);
         this.$nextTick(() => {
           this.setBuildingGeometryConfig();
         });

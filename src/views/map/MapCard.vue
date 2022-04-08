@@ -93,10 +93,16 @@ export default {
   },
   methods: {
     jumpEditMap() {
-      this.$router.push({
-        name: "mapEditor",
-        params: { id: this.mapInfo.map_id },
-      });
+      if (
+        this.mapInfo !== null &&
+        typeof this.mapInfo === "object" &&
+        this.mapInfo.hasOwnProperty("map_id")
+      ) {
+        this.$router.push({
+          name: "mapEditor",
+          params: { id: this.mapInfo.map_id },
+        });
+      }
     },
     async handleToolClick(tool) {
       if (tool === "edit") {

@@ -1,7 +1,14 @@
 <template></template>
 
 <script>
-import { Group, ExtrudeGeometry, MeshLambertMaterial, Mesh } from "three";
+import {
+  Group,
+  ExtrudeGeometry,
+  MeshLambertMaterial,
+  Mesh,
+  Shape,
+  Path,
+} from "three";
 import data from "@/store/data";
 import utils from "@/store/utils";
 export default {
@@ -35,14 +42,17 @@ export default {
       return this.wallGroup;
     },
     initWallGeometry() {
-      let wallHeight =
-        this.wallInfo.properties.wall_floor_height *
-        data.ThreeObjectConfig.floorMargin;
-      let wallThick =
-        this.wallInfo.properties.wall_thick_list[
-          +this.wallInfo.properties.wall_thick
-        ];
-      let shapes = utils.getShape(this.wallInfo.geometries, wallThick);
+      let { zScale } = data.ThreeObjectConfig;
+      let wallHeight = this.wallFloorHeight() * zScale;
+      let wallThick = this.wallThickList()[this.wallThick()];
+      // 构建墙体GeoJSON
+      let geometryObject = utils.generateWallGeometryObject(
+        this.wallGeometryObject(),
+        wallThick
+      );
+      // 构建shape列表
+      let shapes = utils.getShape(geometryObject);
+      // 构建墙体形状
       this.wallGeometry = [];
       for (let shape of shapes) {
         this.wallGeometry.push(
@@ -64,18 +74,13 @@ export default {
       );
     },
     initWallMesh() {
-      let level = this.wallInfo.properties.wall_floor_level;
-      let height =
-        this.wallInfo.properties.wall_floor_height *
-        data.ThreeObjectConfig.zScale;
-      let z = level * (height + 2 * data.ThreeObjectConfig.floorMargin);
       this.wallMesh = [];
       for (let i = 0, len = this.wallGeometry.length; i < len; i++) {
         let mesh = new Mesh(
           this.wallGeometry[i],
           this.wallMaterial[i % this.wallMaterial.length]
         );
-        mesh.position.set(0, 0, z);
+        mesh.position.set(0, 0, 0);
         this.wallMesh.push(mesh);
         this.wallGroup.add(mesh);
       }
@@ -88,6 +93,89 @@ export default {
       this.wallGroup.remove(...this.wallMesh);
       this.initWallGeometry();
       this.initWallMesh();
+    },
+
+    updateWallGeometry(geometry) {
+      this.wallInfo.geometries[0] = geometry;
+      this.wallGroup.remove(...this.wallMesh);
+      this.initWallGeometry();
+      this.initWallMesh();
+    },
+
+    /*******************************************/
+    /**                                       **/
+    /**            Getter & Setter            **/
+    /**                                       **/
+    /*******************************************/
+
+    wallId(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_id = value;
+      }
+      return this.wallInfo.properties.wall_id;
+    },
+
+    wallThick(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_thick = value;
+      }
+      return this.wallInfo.properties.wall_thick;
+    },
+
+    wallFloorHeight(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_floor_height = value;
+      }
+      return this.wallInfo.properties.wall_floor_height;
+    },
+
+    wallFloorLevel(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_floor_level = value;
+      }
+      return this.wallInfo.properties.wall_floor_level;
+    },
+
+    wallThickList(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_thick_list = value;
+      }
+      return this.wallInfo.properties.wall_thick_list;
+    },
+
+    wallBelongFloor(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_belong_floor = value;
+      }
+      return this.wallInfo.properties.wall_belong_floor;
+    },
+
+    wallAttachArea(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_attach_area = value;
+      }
+      return this.wallInfo.properties.wall_attach_area;
+    },
+
+    wallAttachPipe(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.properties.wall_attach_pipe = value;
+      }
+      return this.wallInfo.properties.wall_attach_pipe;
+    },
+
+    wallGeometryObject(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.geometries[0] = value;
+      }
+      return this.wallInfo.geometries[0];
+    },
+
+    wallInsideGeometryObject(value) {
+      if (value !== undefined && value !== null) {
+        this.wallInfo.geometries[1] = value;
+      }
+      return this.wallInfo.geometries[1];
     },
   },
 };
