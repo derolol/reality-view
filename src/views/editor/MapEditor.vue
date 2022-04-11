@@ -69,6 +69,7 @@
     ###########################################################
     ------------------------------------------------------- -->
     <floor-choose
+      ref="floorChoose"
       class="floor-choose-container"
       :style="{ right: `${fullScreenWidth * (1 - canvasScale) + 80}px` }"
       :floors="floors"
@@ -523,7 +524,7 @@
               <el-select
                 size="medium"
                 v-model="editWallModel.wallThick"
-                @change="touchEditWallChange"
+                @change="handleWallThickChange"
               >
                 <el-option
                   v-for="(thick, index) in wallThickList"
@@ -573,7 +574,8 @@ import PoiObject from "@/components/three-object/POIObject.vue";
 import api from "@/request/editor";
 import FloorChoose from "./FloorChoose.vue";
 import data from "@/store/data";
-import utils from "@/store/utils";
+import toolUtil from "@/store/toolUtil";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "mapEditor",
   components: {
@@ -675,7 +677,7 @@ export default {
       editWallShapeConfig: {
         sceneFunc: () => {},
         stroke: "#9477D9",
-        strokeWidth: 2,
+        strokeWidth: 1,
         name: "shape",
         strokeScaleEnabled: false,
       },
@@ -716,6 +718,7 @@ export default {
   },
   activated() {
     this.getFloorGeometry();
+    this.getWallGeometries();
   },
   methods: {
     /*******************************************/
@@ -776,15 +779,15 @@ export default {
     /*******************************************/
 
     initTouchEvent() {
-      this.touchEditBuildingChange = utils.debounce(
+      this.touchEditBuildingChange = toolUtil.debounce(
         this.handleEditBuildingSubmit,
         3000
       );
-      this.touchEditFloorChange = utils.debounce(
+      this.touchEditFloorChange = toolUtil.debounce(
         this.handleEditFloorSubmit,
         3000
       );
-      this.touchEditWallChange = utils.debounce(
+      this.touchEditWallChange = toolUtil.debounce(
         this.handleEditWallSubmit,
         3000
       );
@@ -959,10 +962,10 @@ export default {
       // 初始化楼层轮廓
       let showWidth = this.floorStageConfig.width;
       let showHeight = this.floorStageConfig.height;
-      const box = utils.getShapeBox(geometry.coordinates);
-      const scale = utils.getBoxScale(showWidth, showHeight, box) * 0.9;
+      const box = geometryUtil.getCoordinatesBox(geometry.coordinates);
+      const scale = geometryUtil.getBoxScale(showWidth, showHeight, box) * 0.9;
       this.editFloorShapeConfig = Object.assign({}, this.editFloorShapeConfig, {
-        sceneFunc: utils.generateSceneFunc(
+        sceneFunc: geometryUtil.generateSceneFunc(
           geometry.coordinates,
           scale,
           showWidth,
@@ -1004,9 +1007,10 @@ export default {
         if (geometryChange) {
           let { wall, area } = updated.data;
           let wallId = this.floorRef.floorAttachWall();
-          this.$refs[`wall${wallId}`][0].updateWallGeometry(
+          this.$refs[`wall${wallId}`][0].wallGeometryObject(
             JSON.parse(wall.wall_geometry)
           );
+          this.$refs[`wall${wallId}`][0].updateWallGeometry();
           let areaId = this.floorRef.floorAttachArea()[0];
           this.$refs[`area${areaId}`][0].updateAreaGeometry(
             JSON.parse(area.area_geometry)
@@ -1031,8 +1035,11 @@ export default {
         return;
       }
       // 更新楼层列表
-      floorLevelList.push(newLevel);
-      floorLevelList.splice(floorLevelList.indexOf("" + currentFloorLevel), 1);
+      floorLevelList.splice(
+        floorLevelList.indexOf(+currentFloorLevel),
+        1,
+        +newLevel
+      );
       floorLevelList.sort((a, b) => b - a);
       // 更新楼层映射
       let floorLevelMap = this.buildingRef.buildingFloorLevelMap();
@@ -1050,6 +1057,8 @@ export default {
         this.buildingRef.buildingFloorHeight() * data.ThreeObjectConfig.zScale;
       let z = newLevel * (height + 2 * data.ThreeObjectConfig.floorMargin);
       this.$refs.render.setGridHelperLevel(0, 0, z);
+      // 更新楼层选择器的缓存信息
+      this.$refs.floorChoose.updateFloorMap();
     },
     /**
      * 楼层建筑可见性
@@ -1069,17 +1078,13 @@ export default {
       for (let floorId of floorList) {
         // 若全部可见则显示全部楼层
         if (this.allFloorVisible) {
-          this.floorRef.setFloorGroupVisible(true);
+          this.$refs[`floor${floorId}`][0].setFloorGroupVisible(true);
         } else {
-          // 只显示当前楼层
-          if (floorId === this.currentFloor) {
-            this.floorRef.setFloorGroupVisible(true);
-          } else {
-            // 其余楼层隐藏
-            this.floorRef.setFloorGroupVisible(false);
-          }
+          // 其余楼层隐藏
+          this.$refs[`floor${floorId}`][0].setFloorGroupVisible(false);
         }
       }
+      this.floorRef.setFloorGroupVisible(true);
     },
     /**
      * 跳转到楼层轮廓编辑页面
@@ -1100,17 +1105,12 @@ export default {
      * 获取完成编辑的楼层 Geometry
      */
     getFloorGeometry() {
-      let floorId = this.$route.params.floorId;
-      let floorGeometry = this.$route.params.geometry;
-      if (
-        floorId === null ||
-        floorGeometry === null ||
-        floorId === undefined ||
-        floorGeometry === undefined
-      ) {
+      let drawMode = this.$route.params.drawMode;
+      if (typeof drawMode !== "string" || drawMode !== "floor") {
         return;
       }
-      this.currentFloor = floorId;
+      let floorGeometry = this.$route.params.geometry;
+      this.currentFloor = this.$route.params.floorId;
       this.$refs[`floor${this.currentFloor}`][0].updateFloorGeometry(
         floorGeometry
       );
@@ -1233,33 +1233,31 @@ export default {
      * 删除楼层
      */
     async handleFloorDeletion() {
+      let deleteFloorId = +this.currentFloor;
+      let deleteFloorLevel = +this.floorRef.floorLevel();
       this.floorDeletionVisible = false;
       if (this.floors.length === 1) {
         this.$message.error("删除失败：楼层数量不能小于1");
         return;
       }
-      let deleted = await api.deleteFloor(this.currentFloor);
+      let deleted = await api.deleteFloor(deleteFloorId);
       if (deleted.code !== 200) {
         this.$message.error("删除失败：请重试");
         return;
       }
       this.$message.info("删除楼层成功");
+      //更新建筑关联楼层
+      let floorIdList = this.buildingRef.buildingAttachFloor();
+      let floorIdIndex = floorIdList.findIndex((v) => v == deleteFloorId);
+      floorIdList.splice(floorIdIndex, 1);
       // 更新楼层列表
       let floorLevelList = this.buildingRef.buildingFloorLevelList();
-      let index = floorLevelList.findIndex(
-        (v) => v == this.floorRef.floorLevel()
-      );
+      let index = floorLevelList.findIndex((v) => v == deleteFloorLevel);
       floorLevelList.splice(index, 1);
       // 更新楼层映射
       let floorLevelMap = this.buildingRef.buildingFloorLevelMap();
-      delete floorLevelMap[this.floorRef.floorLevel()];
-      console.log(floorLevelList);
+      delete floorLevelMap[deleteFloorLevel];
       floorLevelList.sort((a, b) => b - a);
-      // 删除该楼层数据
-      const floorIndex = this.floors.findIndex(
-        (v) => +v.properties.floor_id === +this.currentFloor
-      );
-      this.floors.splice(floorIndex, 1);
       // 更新建筑轮廓
       this.buildingRef.floorLevelChange(
         Math.max(...floorLevelList),
@@ -1268,6 +1266,11 @@ export default {
       // 更新当前默认 floor id，位于中间的楼层
       let level = floorLevelList[Math.floor(floorLevelList.length / 2)];
       this.handleChooseFloorChange(floorLevelMap[level]);
+      // 删除该楼层数据
+      const floorIndex = this.floors.findIndex(
+        (v) => +v.properties.floor_id === deleteFloorId
+      );
+      this.floors.splice(floorIndex, 1);
     },
     /**
      * 用户点击切换当前楼层
@@ -1288,13 +1291,14 @@ export default {
         // 初始化楼层轮廓
         let showWidth = this.floorStageConfig.width;
         let showHeight = this.floorStageConfig.height;
-        const box = utils.getShapeBox(geometry.coordinates);
-        const scale = utils.getBoxScale(showWidth, showHeight, box) * 0.9;
+        const box = geometryUtil.getCoordinatesBox(geometry.coordinates);
+        const scale =
+          geometryUtil.getBoxScale(showWidth, showHeight, box) * 0.9;
         this.editFloorShapeConfig = Object.assign(
           {},
           this.editFloorShapeConfig,
           {
-            sceneFunc: utils.generateSceneFunc(
+            sceneFunc: geometryUtil.generateSceneFunc(
               geometry.coordinates,
               scale,
               showWidth,
@@ -1339,24 +1343,28 @@ export default {
         return;
       }
       this.wallThickList = this.wallRef.wallThickList();
-      let geometry = this.wallRef.wallGeometryObject();
-      console.log(+this.wallRef.wallThick());
+      let wallGeometry = this.wallRef.wallGeometryObject();
+      let wallInsideGeometry = this.wallRef.wallInsideGeometryObject();
       this.editWallModel = {
         wallThick: +this.wallRef.wallThick(),
-        wallGeometry: geometry,
-        wallInsideGeometry: this.wallRef.wallInsideGeometryObject(),
+        wallGeometry,
+        wallInsideGeometry,
       };
       // 初始化墙体轮廓
       let showWidth = this.wallStageConfig.width;
       let showHeight = this.wallStageConfig.height;
-      let thick = this.wallThickList[this.editWallModel.wallThick];
+      let thick = this.wallThickList[+this.editWallModel.wallThick - 1];
       // 构建墙体形状
-      let wallGeometry = utils.generateWallGeometryObject(geometry, thick);
-      const box = utils.getShapeBox(wallGeometry.coordinates);
-      const scale = utils.getBoxScale(showWidth, showHeight, box) * 0.9;
+      let { shapeCoordinates } = geometryUtil.generateWallCoordinates(
+        wallGeometry.coordinates,
+        wallInsideGeometry.coordinates,
+        thick
+      );
+      const box = geometryUtil.getCoordinatesBox(shapeCoordinates);
+      const scale = geometryUtil.getBoxScale(showWidth, showHeight, box) * 0.9;
       this.editWallShapeConfig = Object.assign({}, this.editWallShapeConfig, {
-        sceneFunc: utils.generateSceneFunc(
-          wallGeometry.coordinates,
+        sceneFunc: geometryUtil.generateSceneFunc(
+          shapeCoordinates,
           scale,
           showWidth,
           showHeight
@@ -1366,19 +1374,102 @@ export default {
       });
     },
     handleEditWallDrawerClose() {},
-    handleEditWallSubmit() {},
+    async handleEditWallSubmit(areas) {
+      let wallId = +this.floorRef.floorAttachWall();
+      const edit = {
+        wall_thick: this.editWallModel.wallThick,
+        wall_geometry: JSON.stringify(this.editWallModel.wallGeometry),
+        wall_inside_geometry: JSON.stringify(
+          this.editWallModel.wallInsideGeometry
+        ),
+      };
+      if (areas === null || areas === undefined) {
+        let thick =
+          this.wallRef.wallThickList()[+this.editWallModel.wallThick - 1];
+        let { areaCoordinates } = geometryUtil.generateWallCoordinates(
+          this.editWallModel.wallGeometry.coordinates,
+          this.editWallModel.wallInsideGeometry.coordinates,
+          thick
+        );
+        areas = areaCoordinates.map((area) => {
+          return {
+            type:
+              toolUtil.countArrayLevel(area) === 3 ? "Polygon" : "MultiPolygon",
+            coordinates: toolUtil.arraySimpleDeepCopy(area),
+          };
+        });
+      }
+      // 更新本地floor组件数据
+      this.wallRef.updateWallInfo({
+        wall_thick: this.editWallModel.wallThick,
+        wall_geometry: this.editWallModel.wallGeometry,
+        wall_inside_geometry: this.editWallModel.wallInsideGeometry,
+      });
+      // 上传建筑数据
+      const updated = await api.updateWall(wallId, {
+        floor: this.currentFloor,
+        info: edit,
+        areas: JSON.stringify(areas),
+      });
+      if (updated.code !== 200) {
+        console.log(updated);
+        return;
+      }
+      let deletedAreaList = this.floorRef.floorAttachArea();
+      let areaList = updated.data.createAreas;
+      // 获取新的功能区id列表
+      let areaIdList = areaList.map((area) => area.properties.area_id);
+      this.floorRef.floorAttachArea(areaIdList);
+      // 删除所有功能区
+      for (let d of deletedAreaList) {
+        let index = this.areas.findIndex((v) => d == v.properties.area_id);
+        this.areas.splice(index, 1);
+      }
+      this.areas.push(...areaList);
+      this.$nextTick(() => {
+        this.floorRef.addAreaGroupObject();
+        this.wallRef.updateWallGeometry();
+      });
+    },
     jumpWallGeometryPalette() {
       this.$router.push({
         name: "palette",
         params: {
           drawMode: "wall",
-          wallThick: this.wallRef.wallThickList()[this.wallRef.wallThick()],
+          wallThick: this.wallRef.wallThickList()[this.wallRef.wallThick() - 1],
           wallGeometry: this.wallRef.wallGeometryObject(),
           wallInsideGeometry: this.wallRef.wallInsideGeometryObject(),
           mapId: this.$route.params.id,
           floorId: this.currentFloor,
         },
       });
+    },
+    /**
+     * 获取完成编辑的楼层 Geometry
+     */
+    getWallGeometries() {
+      let drawMode = this.$route.params.drawMode;
+      if (typeof drawMode !== "string" || drawMode !== "wall") {
+        return;
+      }
+      let { floorId, wallGeometry, wallInsideGeometry, areaGeometries } =
+        this.$route.params;
+      this.currentFloor = floorId;
+      this.wallRef.wallGeometryObject(wallGeometry);
+      this.wallRef.wallInsideGeometryObject(wallInsideGeometry);
+      this.editWallDrawerVisible = false;
+      this.handleEditWallClick();
+      this.handleEditWallSubmit(areaGeometries);
+    },
+    handleWallThickChange() {
+      this.touchEditWallChange();
+      // 更新本地floor组件数据
+      this.wallRef.updateWallInfo({
+        wall_thick: this.editWallModel.wallThick,
+        wall_geometry: this.editWallModel.wallGeometry,
+        wall_inside_geometry: this.editWallModel.wallInsideGeometry,
+      });
+      this.wallRef.updateWallGeometry();
     },
   },
 };

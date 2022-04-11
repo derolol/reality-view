@@ -2,8 +2,9 @@
 
 <script>
 import { ExtrudeGeometry, MeshLambertMaterial, Mesh, Group } from "three";
-import utils from "@/store/utils";
 import data from "@/store/data";
+import clipperUtil from "@/store/clipperUtil";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "buildingObject",
   props: {
@@ -15,17 +16,17 @@ export default {
   data() {
     return {
       scene: null,
-      buildingGeometry: null,
+      buildingGeometry: [],
       buildingMaterial: null,
-      buildingMesh: null,
+      buildingMesh: [],
       buildingGroup: null,
     };
   },
   created() {
     this.initBuildingGeometry();
     this.initBuildingMaterial();
-    this.initBuildingMesh();
     this.initBuildingGroup();
+    this.initBuildingMesh();
   },
   computed: {
     refs() {
@@ -43,7 +44,6 @@ export default {
         let floor = this.refs[`floor${floors[i]}`][0].getFloorGroup();
         this.buildingGroup.add(floor);
       }
-      this.buildingGroup.add(this.buildingMesh);
     },
     getBuildingGroup() {
       return this.buildingGroup;
@@ -52,6 +52,7 @@ export default {
       let floors = this.buildingAttachFloor();
       floors.push(floorId);
       this.refs[`floor${floorId}`][0].initGroupObjects();
+      this.refs[`floor${floorId}`][0].setScene(this.scene);
       let floorGroup = this.refs[`floor${floorId}`][0].getFloorGroup();
       this.buildingGroup.add(floorGroup);
     },
@@ -62,12 +63,22 @@ export default {
       let height = this.buildingFloorHeight() * data.ThreeObjectConfig.zScale;
       let depth =
         (max - min + 1) * (height + 2 * data.ThreeObjectConfig.floorMargin);
-      let shape = utils.getShape(this.buildingGeometryObject(), -3);
-      this.buildingGeometry = new ExtrudeGeometry(shape, {
-        steps: 1,
-        depth,
-        bevelEnabled: false,
-      });
+      // 扩张建筑点集
+      let scaleCoordinates = clipperUtil.coordinatesPolygonOffset(
+        this.buildingGeometryObject().coordinates,
+        3
+      );
+      let shapes = geometryUtil.getShapeByCoordinates(scaleCoordinates);
+      this.buildingGeometry.splice(0, this.buildingGeometry.length);
+      for (let shape of shapes) {
+        this.buildingGeometry.push(
+          new ExtrudeGeometry(shape, {
+            steps: 1,
+            depth,
+            bevelEnabled: false,
+          })
+        );
+      }
     },
     initBuildingMaterial() {
       this.buildingMaterial = new MeshLambertMaterial({
@@ -82,12 +93,15 @@ export default {
       let z =
         min * (height + 2 * data.ThreeObjectConfig.floorMargin) -
         data.ThreeObjectConfig.floorMargin;
-      this.buildingMesh = new Mesh(
-        this.buildingGeometry,
-        this.buildingMaterial
-      );
-      this.buildingMesh.position.set(0, 0, z);
-      this.buildingMesh.renderOrder = 1;
+      this.buildingMesh.splice(0, this.buildingMesh.length);
+      for (let i = 0, len = this.buildingGeometry.length; i < len; i++) {
+        let mesh = new Mesh(this.buildingGeometry[i], this.buildingMaterial);
+        mesh.position.set(0, 0, z);
+        mesh.renderOrder = 1;
+        mesh.name = `building${this.buildingId()}-three${i}`;
+        this.buildingMesh.push(mesh);
+        this.buildingGroup.add(mesh);
+      }
     },
     initBuildingGroup() {
       this.buildingGroup = new Group();
@@ -96,7 +110,9 @@ export default {
      * 控制建筑轮廓的显示与隐藏
      */
     updateBuildingMeshVisible(visible) {
-      this.buildingMesh.visible = visible;
+      for (let mesh of this.buildingMesh) {
+        mesh.visible = visible;
+      }
     },
     /**
      * 更新建筑楼层高度
@@ -107,7 +123,6 @@ export default {
       this.buildingGroup.remove(this.buildingMesh);
       this.initBuildingGeometry();
       this.initBuildingMesh();
-      this.buildingGroup.add(this.buildingMesh);
     },
     /**
      * 建筑内部楼层改变
@@ -119,7 +134,6 @@ export default {
       this.buildingGroup.remove(this.buildingMesh);
       this.initBuildingGeometry();
       this.initBuildingMesh();
-      this.buildingGroup.add(this.buildingMesh);
     },
 
     /*******************************************/

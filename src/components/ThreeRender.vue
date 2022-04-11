@@ -19,7 +19,7 @@ import {
   Euler,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import utils from "@/store/utils";
+import toolUtil from "@/store/toolUtil";
 export default {
   name: "MapRender",
   props: {
@@ -186,7 +186,7 @@ export default {
         this.mapRenderer.domElement
       );
       this.mapController.update();
-      let changeEvent = utils.throttle(this.mapControllerChange, 500);
+      let changeEvent = toolUtil.throttle(this.mapControllerChange, 500);
       this.mapController.addEventListener("change", changeEvent);
       this.mapController.addEventListener("end", this.mapControllerChange);
     },

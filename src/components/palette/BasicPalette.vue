@@ -53,21 +53,16 @@
           变形器
         
         -->
-        <v-transformer
+        <!-- <v-transformer
           ref="transformer"
           :config="{
             centeredScaling: true,
             rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
           }"
           @transformend="handleTransform"
-        />
+        /> -->
         <v-shape ref="tempShape" :config="tempShapeConfig" />
-        <!-- 
 
-          绘制自定义形状时的鼠标所在端点
-        
-        -->
-        <v-circle v-if="cursorPointVisible" :config="cursorPointConfig" />
         <!-- 
 
           绘制自定义形状时的端点
@@ -86,19 +81,44 @@
             y: getShowY(p[1]),
           }"
         />
-        <v-circle v-if="polygonClose" :config="polygonClosePointConfig" />
         <!-- 
           
           绘制自定义形状时的连接虚线
         
         -->
-        <v-shape v-if="shapeType === 'polygon'" :config="lineHelperConfig" />
-        <v-wedge v-if="shapeType === 'polygon'" :config="degreeHelperConfig" />
+        <v-shape
+          v-if="shapeType === 'polygon' || wallDrawHelperVisible"
+          :config="lineHelperConfig"
+        />
+        <v-wedge
+          v-if="shapeType === 'polygon' || wallDrawHelperVisible"
+          :config="degreeHelperConfig"
+        />
         <v-text
-          v-if="shapeType === 'polygon'"
+          v-if="shapeType === 'polygon' || wallDrawHelperVisible"
           :config="degreeHelperTextConfig"
         />
-        <v-line v-if="colinearHelperVisible" :config="colinearHelperConfig" />
+
+        <!-- 
+
+          共线提示辅助线
+
+         -->
+        <v-shape v-if="colinearHelperVisible" :config="colinearHelperConfig" />
+        <v-shape v-if="colinearHelperVisible" :config="focusLineHelperConfig" />
+
+        <!-- 
+
+          绘制自定义形状时的鼠标所在端点
+        
+        -->
+        <v-circle v-if="cursorPointVisible" :config="cursorPointConfig" />
+        <!-- 
+
+          闭合提示点
+
+         -->
+        <v-circle v-if="polygonClose" :config="polygonClosePointConfig" />
       </v-layer>
     </v-stage>
 
@@ -113,7 +133,7 @@
         v-model="distanceHelperValue"
         class="distance-helper-input"
         size="mini"
-        v-if="shapeType === 'polygon'"
+        v-if="shapeType === 'polygon' || wallDrawHelperVisible"
         @keyup.enter.native="handleDistanceEnter"
       />
     </div>
@@ -198,8 +218,10 @@
 <script>
 const GRID_WIDTH = 10;
 const GRID_NUMBER = 10;
-import utils from "@/store/utils";
-import * as martinez from "martinez-polygon-clipping";
+import toolUtil from "@/store/toolUtil";
+import mathUtil from "@/store/mathUtil";
+import clipperUtil from "@/store/clipperUtil";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "basicPalette",
   props: {
@@ -233,6 +255,8 @@ export default {
       currentFloor: -1,
 
       beginDraw: false,
+      shiftKeyStatus: false,
+      altKeyStatus: false,
 
       pointX: 0,
       pointY: 0,
@@ -252,14 +276,14 @@ export default {
         name: "shape",
         sceneFunc: () => {},
         stroke: "#9477D9",
-        strokeWidth: 2,
+        strokeWidth: 1,
         strokeScaleEnabled: false, // 缩放不影响描边粗细
       },
       tempShapeCoordinates: [],
       tempShapeConfig: {
         sceneFunc: () => {},
         stroke: "#9477D9",
-        strokeWidth: 2,
+        strokeWidth: 1,
         strokeScaleEnabled: false, // 缩放不影响描边粗细
       },
       cursorPointVisible: false, // 光标跟随点
@@ -273,12 +297,12 @@ export default {
       lineHelperConfig: {
         sceneFunc: () => {},
         stroke: "#D1BFFF",
-        strokeWidth: 2,
+        strokeWidth: 1,
         dash: [5, 2],
       },
       degreeHelperConfig: {
         stroke: "#D1BFFF",
-        strokeWidth: 2,
+        strokeWidth: 1,
       },
       degreeHelperTextConfig: {
         fontSize: 16,
@@ -293,16 +317,24 @@ export default {
         radius: 4,
       },
       colinearHelperVisible: false, // 共线辅助线
+      colinearHelperCoordinates: [],
       colinearHelperConfig: {
-        points: [],
+        sceneFunc: () => {},
         stroke: "#E6A23C",
         strokeWidth: 1,
         dash: [5, 2],
       },
+      focusLineHelperCoordinates: [],
+      focusLineHelperConfig: {
+        sceneFunc: () => {},
+        stroke: "#F27B7B",
+        strokeWidth: 1,
+      },
+      wallDrawHelperVisible: false,
 
       stickDistance: 0.4,
       closeDistance: 8,
-      wallStickDistance: 8,
+      wallStickDistance: 6,
       stickDegree: [
         [-5, 5, 0],
         [85, 95, 90],
@@ -315,35 +347,33 @@ export default {
       degreeHelperValue: 0,
       distanceHelperValue: 0,
 
+      wallThick: 0,
       wallVectors: [],
+      wallCoordinates: null,
+      wallInsideCoordinates: null,
+      areaCoordinates: null,
+      areaBeforeCoordinates: null,
 
       mouseMoveThrottleEvent: null,
     };
   },
   created() {
-    this.mouseMoveThrottleEvent = utils.throttle(this.handleStageMouseMove, 50);
+    this.mouseMoveThrottleEvent = toolUtil.throttle(
+      this.handleStageMouseMove,
+      50
+    );
   },
   watch: {
     gridValue() {
       this.$emit("gridValueChange");
       if (Array.isArray(this.tempShapeCoordinates)) {
         this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
-          sceneFunc: utils.generateSceneFunc(
-            this.tempShapeCoordinates,
-            this.canvasScale,
-            this.canvasWidth,
-            this.canvasHeight
-          ),
+          sceneFunc: this.generateSceneFunc(this.tempShapeCoordinates),
         });
       }
       if (Array.isArray(this.shapeCoordinates)) {
         this.shapeConfig = Object.assign({}, this.shapeConfig, {
-          sceneFunc: utils.generateSceneFunc(
-            this.shapeCoordinates,
-            this.canvasScale,
-            this.canvasWidth,
-            this.canvasHeight
-          ),
+          sceneFunc: this.generateSceneFunc(this.shapeCoordinates),
         });
       }
     },
@@ -532,108 +562,12 @@ export default {
           this.handlePipeMouseDown(e);
           break;
       }
-      // // 处理用户选中形状事件
-      // if (!this.startPaintPolygon) {
-      //   // 用户选中state，取消当前的选中
-      //   if (e.target === e.target.getStage()) {
-      //     this.selectedShape = null;
-      //     // 更新当前的transformer状态
-      //     this.updateTransformer();
-      //     return;
-      //   }
-
-      //   // 判断是否点击了Shape
-      //   const clickedOnShape = e.target.name() === "shape";
-      //   if (!clickedOnShape) {
-      //     return;
-      //   }
-
-      //   // 获取选中的shape节点
-      //   this.selectedShape = this.$refs.shape.getNode();
-      //   // 更新当前的transformer状态
-      //   this.updateTransformer();
-      //   return;
-      // }
-
-      // let scale = this.$refs.palette.getCanvasScale();
-      // let point = this.$refs.palette.getMousePosition();
-      // let x = point.x;
-      // let y = point.y;
-
-      // // 判断是否需要封闭图形
-      // if (
-      //   utils.distanceBetweenPoints(
-      //     [this.shapePoints[0], this.shapePoints[1]],
-      //     [x, y]
-      //   ) < 0.5
-      // ) {
-      //   this.startPaintPolygon = false;
-      //   this.$message.info("多边形绘制完成");
-      //   // 完成绘制封闭图形
-      //   let { width, height, offsetX, offsetY } = this.resizePaintShape();
-      //   this.currentShapeConfig = Object.assign({}, this.currentShapeConfig, {
-      //     sceneFunc: (context, shape) => {
-      //       context.beginPath();
-      //       for (let i = 0, len = this.shapePoints.length; i < len; i += 2) {
-      //         let x = this.shapePoints[i] * scale;
-      //         let y = -this.shapePoints[i + 1] * scale;
-      //         if (i === 0) context.moveTo(x, y);
-      //         context.lineTo(x, y);
-      //       }
-      //       context.closePath();
-      //       context.fillStrokeShape(shape);
-      //     },
-      //     width,
-      //     height,
-      //     offsetX,
-      //     offsetY,
-      //   });
-      //   // 重置辅助线属性
-      //   this.currentLineHelperConfig = Object.assign(
-      //     {},
-      //     {
-      //       points: [],
-      //       stroke: "#D1BFFF",
-      //       strokeWidth: 2,
-      //       dash: [5, 2],
-      //     }
-      //   );
-      //   // 清空绘制点
-      //   this.divideShapePoint.splice(0, this.divideShapePoint.length);
-      //   return;
-      // }
-
-      // // 新增绘制点
-      // this.shapePoints.push(x, y);
-      // let { width, height, offsetX, offsetY } = this.getShapeRange();
-      // this.currentShapeConfig = Object.assign({}, this.currentShapeConfig, {
-      //   width,
-      //   height,
-      //   offsetX,
-      //   offsetY,
-      // });
-
-      // // 生成当前临时图形的临时端点
-      // this.divideShapePoint = [...new Array(this.shapePoints.length / 2)].map(
-      //   (v, i) => [this.shapePoints[i * 2], this.shapePoints[i * 2 + 1]]
-      // );
     },
     handleBuildingMouseDown(e) {
       this.mouseDown = true;
 
       // 用户此时不处于绘制状态，处理形状点击事件
       if (!this.beginDraw) {
-        // // 用户选中state，取消当前的选中
-        // if (e.target === e.target.getStage()) {
-        //   this.selectedShape = null;
-        //   // 更新当前的transformer状态
-        //   this.updateTransformer();
-        //   return;
-        // }
-        // const clickedOnShape = e.target.name() === "shape";
-        // if (!clickedOnShape) return;
-        // this.selectedShape = this.$refs.shape.getNode();
-        // this.updateTransformer();
         return;
       }
 
@@ -657,7 +591,7 @@ export default {
             ];
             // 满足闭合条件
             if (
-              utils.distanceBetweenPoints(p1, p2) <=
+              mathUtil.distanceBetweenPoints(p1, p2) <=
               this.closeDistance / this.canvasScale
             ) {
               this.polygonClose = false;
@@ -669,12 +603,7 @@ export default {
           this.tempShapeCoordinates[0].push([this.pointX, this.pointY]);
           if (this.tempShapeCoordinates[0].length > 1) {
             this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
-              sceneFunc: utils.generateSceneFunc(
-                this.tempShapeCoordinates,
-                this.canvasScale,
-                this.canvasWidth,
-                this.canvasHeight
-              ),
+              sceneFunc: this.generateSceneFunc(this.tempShapeCoordinates),
             });
           }
         }
@@ -682,6 +611,45 @@ export default {
     },
     handleFloorMouseDown(e) {
       this.handleBuildingMouseDown(e);
+    },
+    handleWallMouseDown(e) {
+      let p = [this.pointX, this.pointY];
+      // 判断点集是否开始初始化
+      if (this.tempShapeCoordinates.length === 0) {
+        this.tempShapeCoordinates.push([]);
+      }
+      // 判断是否闭合的条件
+      if (this.tempShapeCoordinates[0].length > 0) {
+        // 判断点所在向量数组是否存在向量
+        if (
+          this.focusLineHelperCoordinates.length > 0 &&
+          this.focusLineHelperCoordinates[0].length > 0
+        ) {
+          // 满足闭合条件，完成绘制
+          this.tempShapeCoordinates[0].push(p);
+          this.polygonClose = false;
+          this.finishDraw();
+          return;
+        }
+      }
+      // 第一个点必须保证在墙上
+      if (this.tempShapeCoordinates[0].length === 0) {
+        if (
+          this.focusLineHelperCoordinates.length === 0 ||
+          this.focusLineHelperCoordinates[0].length === 0
+        ) {
+          this.$message.warning("必须从现有墙体开始绘制");
+          return;
+        }
+      }
+      // 增加绘制点
+      this.tempShapeCoordinates[0].push(p);
+      // 绘制形状
+      if (this.tempShapeCoordinates[0].length > 1) {
+        this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
+          sceneFunc: this.generateSceneFunc(this.tempShapeCoordinates),
+        });
+      }
     },
     /**
      * 鼠标移动事件
@@ -736,12 +704,7 @@ export default {
             )
           );
           this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
-            sceneFunc: utils.generateSceneFunc(
-              this.tempShapeCoordinates,
-              this.canvasScale,
-              this.canvasWidth,
-              this.canvasHeight
-            ),
+            sceneFunc: this.generateSceneFunc(this.tempShapeCoordinates),
           });
           break;
         }
@@ -762,7 +725,7 @@ export default {
             let p = [this.pointX, this.pointY];
             // 若满足闭合条件，则将当前鼠标点定位到首个端点
             if (
-              utils.distanceBetweenPoints(p, p2) <=
+              mathUtil.distanceBetweenPoints(p, p2) <=
               this.closeDistance / this.canvasScale
             ) {
               this.pointX = p2[0];
@@ -786,8 +749,8 @@ export default {
                   y: this.getShowY(this.pointY),
                 }
               );
-              this.degreeHelperValue = utils.getPointAngleDegree(p1, p2);
-              this.distanceHelperValue = utils.distanceBetweenPoints(p1, p2);
+              this.degreeHelperValue = mathUtil.getPointAngleDegree(p1, p2);
+              this.distanceHelperValue = mathUtil.distanceBetweenPoints(p1, p2);
               this.handleHelperDraw();
               return;
             } else {
@@ -817,10 +780,14 @@ export default {
       let p1 = this.tempShapeCoordinates[0][len - 1];
       let p2 = [this.pointX, this.pointY];
       // 显示与前一个点的关系提示
-      let degree = utils.getPointAngleDegree(p1, p2);
-      degree = Math.floor(degree);
-      let distance = utils.distanceBetweenPoints(p1, p2);
-      distance = Math.floor(distance);
+      let degree = mathUtil.getPointAngleDegree(p1, p2);
+      if (this.shiftKeyStatus) {
+        degree = Math.floor(degree);
+      }
+      let distance = mathUtil.distanceBetweenPoints(p1, p2);
+      if (this.altKeyStatus) {
+        distance = Math.floor(distance);
+      }
       // 角度粘性判断
       for (let stickGroup of this.stickDegree) {
         let min = stickGroup[0];
@@ -922,12 +889,7 @@ export default {
         points
       );
       this.lineHelperConfig = Object.assign({}, this.lineHelperConfig, {
-        sceneFunc: utils.generateSceneFunc(
-          this.lineHelperCoordinates,
-          this.canvasScale,
-          this.canvasWidth,
-          this.canvasHeight
-        ),
+        sceneFunc: this.generateSceneFunc(this.lineHelperCoordinates),
       });
       // 绘制角度辅助线
       this.degreeHelperConfig = Object.assign({}, this.degreeHelperConfig, {
@@ -988,49 +950,92 @@ export default {
         x: this.getShowX(this.pointX),
         y: this.getShowY(this.pointY),
       });
-      this.handleBuildingMouseDown();
+      switch (this.drawMode) {
+        case "building":
+          this.handleBuildingMouseDown();
+          break;
+        case "floor":
+          this.handleFloorMouseDown();
+          break;
+        case "wall":
+          this.handleWallMouseDown();
+          break;
+        case "pipe":
+          this.handlePipeMouseDown();
+          break;
+      }
     },
     handleFloorMouseMove(e) {
       this.handleBuildingMouseMove(e);
     },
     handleWallMouseMove(e) {
-      let { vector, point } = utils.checkPointNearVectors(
+      let { nearVectors, nearPoint } = mathUtil.checkPointNearVectors(
         [this.pointX, this.pointY],
         this.wallVectors,
         this.wallStickDistance / this.canvasScale
       );
       // 若点在向量附近则将点移动到垂足
-      if (vector !== null) {
-        this.pointX = point[0];
-        this.pointY = point[1];
-        // 判断点是否在线段内
+      if (nearVectors.length > 0) {
+        this.pointX = nearPoint[0];
+        this.pointY = nearPoint[1];
         let p = [this.pointX, this.pointY];
-        // 不在线段内需要显示辅助线提示
-        if (!utils.checkPointOnSegment(p, vector)) {
-          // 判断点最近的线段一端
-          let d1 = utils.distanceBetweenPoints(p, vector[0]);
-          let d2 = utils.distanceBetweenPoints(p, vector[1]);
-          let line = [];
-          if (d1 < d2) line = [p, vector[0]];
-          else line = [p, vector[1]];
-          line = line.map((v) => [this.getShowX(v[0]), this.getShowY(v[1])]);
-          this.colinearHelperConfig = Object.assign(
-            {},
-            this.colinearHelperConfig,
-            {
-              points: line.flat(Infinity),
-            }
-          );
-          this.colinearHelperVisible = true;
-          // 移动跟随光标端点
-          this.cursorPointConfig = Object.assign({}, this.cursorPointConfig, {
-            x: this.getShowX(this.pointX),
-            y: this.getShowY(this.pointY),
-          });
-          return;
+        // 清空辅助线
+        this.colinearHelperCoordinates.splice(
+          0,
+          this.colinearHelperCoordinates.length
+        );
+        this.focusLineHelperCoordinates.splice(
+          0,
+          this.focusLineHelperCoordinates.length
+        );
+        // 遍历线段判断点是否在线段内
+        for (let v of nearVectors) {
+          // 不在线段内需要显示辅助线提示
+          if (!mathUtil.checkPointOnSegment(p, v)) {
+            // 判断点最近的线段一端
+            let d1 = mathUtil.distanceBetweenPoints(p, v[0]);
+            let d2 = mathUtil.distanceBetweenPoints(p, v[1]);
+            let line = [];
+            if (d1 < d2) line = [p, v[0]];
+            else line = [p, v[1]];
+            this.colinearHelperCoordinates.push(line);
+          } else {
+            // // 生成内部墙体（需确保点集为逆时针）
+            // this.focusLineHelperCoordinates.push(
+            //   mathUtil.distanceParallelLine(v, this.wallThick)
+            // );
+            this.focusLineHelperCoordinates.push(v);
+          }
         }
+        // 绘制共线辅助线
+        this.colinearHelperConfig = Object.assign(
+          {},
+          this.colinearHelperConfig,
+          {
+            sceneFunc: this.generateSceneFunc(this.colinearHelperCoordinates),
+          }
+        );
+        // 绘制所在线段辅助助线
+        this.focusLineHelperConfig = Object.assign(
+          {},
+          this.focusLineHelperConfig,
+          {
+            sceneFunc: this.generateSceneFunc(this.focusLineHelperCoordinates),
+          }
+        );
+        this.colinearHelperVisible = true;
+      } else {
+        this.colinearHelperVisible = false;
       }
-      this.colinearHelperVisible = false;
+
+      // 判断是否需要显示角度和长度提示
+      if (
+        this.tempShapeCoordinates.length > 0 &&
+        this.tempShapeCoordinates[0].length > 0
+      ) {
+        this.generatePointTip();
+        this.handleHelperDraw();
+      }
 
       // 移动跟随光标端点
       this.cursorPointConfig = Object.assign({}, this.cursorPointConfig, {
@@ -1068,6 +1073,7 @@ export default {
     handleFloorMouseUp(e) {
       this.handleBuildingMouseUp(e);
     },
+    handleWallMouseUp(e) {},
     finishDraw(save = true) {
       // 根据绘画模式判断
       switch (this.drawMode) {
@@ -1117,18 +1123,7 @@ export default {
             sceneFunc: () => {},
           });
           // 隐藏绘制提示
-          this.lineHelperConfig = Object.assign({}, this.lineHelperConfig, {
-            sceneFunc: () => {},
-          });
-          this.degreeHelperConfig = Object.assign({}, this.degreeHelperConfig, {
-            radius: 0,
-          });
-          this.degreeHelperTextConfig = Object.assign(
-            {},
-            this.degreeHelperTextConfig,
-            { text: "" }
-          );
-          this.distanceHelperInputStyle = "left:0px;top:-40px;";
+          this.clearTipShape();
           break;
         }
       }
@@ -1144,14 +1139,14 @@ export default {
           if (save) {
             this.convertTemp();
             // 与楼层轮廓相交，避免超出轮廓
-            this.tempShapeCoordinates = martinez.intersection(
+            this.tempShapeCoordinates = clipperUtil.coordinatesPolygonClipper(
               this.basicShapeCoordinates,
-              this.tempShapeCoordinates
+              this.tempShapeCoordinates,
+              "intersection"
             );
-            this.tempShapeCoordinates = this.formatMartinezBool(
-              this.tempShapeCoordinates
-            );
-            console.log(this.tempShapeCoordinates);
+            // this.tempShapeCoordinates = this.formatMartinezBool(
+            //   this.tempShapeCoordinates
+            // );
             this.replaceTemp();
           }
           break;
@@ -1166,13 +1161,14 @@ export default {
             this.tempShapeCoordinates[0].push(p);
             this.convertTemp();
             // 与楼层轮廓相交，避免超出轮廓
-            this.tempShapeCoordinates = martinez.intersection(
+            this.tempShapeCoordinates = clipperUtil.coordinatesPolygonClipper(
               this.basicShapeCoordinates,
-              this.tempShapeCoordinates
+              this.tempShapeCoordinates,
+              "intersection"
             );
-            this.tempShapeCoordinates = this.formatMartinezBool(
-              this.tempShapeCoordinates
-            );
+            // this.tempShapeCoordinates = this.formatMartinezBool(
+            //   this.tempShapeCoordinates
+            // );
             this.replaceTemp();
           }
           this.lineHelperConfig = Object.assign({}, this.lineHelperConfig, {
@@ -1182,40 +1178,62 @@ export default {
           this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
             sceneFunc: () => {},
           });
+          // 隐藏绘制提示
+          this.clearTipShape();
           break;
         }
       }
     },
+    handleWallFinishDraw(save) {
+      if (save) {
+        // 添加新的内部墙体向量
+        this.wallInsideCoordinates.push(this.tempShapeCoordinates);
+        // 保存当前主控制区
+        this.beforeShapeCoordinates = toolUtil.arraySimpleDeepCopy(
+          this.shapeCoordinates
+        );
+        this.buildWallCoordiantes();
+        // temp置空
+        this.tempShapeCoordinates = [];
+        this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
+          sceneFunc: () => {},
+        });
+      }
+      this.lineHelperConfig = Object.assign({}, this.lineHelperConfig, {
+        sceneFunc: () => {},
+      });
+      this.tempShapeCoordinates = [];
+      this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
+        sceneFunc: () => {},
+      });
+      // 隐藏绘制提示
+      this.clearTipShape();
+    },
+    clearTipShape() {
+      this.lineHelperConfig = Object.assign({}, this.lineHelperConfig, {
+        sceneFunc: () => {},
+      });
+      this.degreeHelperConfig = Object.assign({}, this.degreeHelperConfig, {
+        radius: 0,
+      });
+      this.degreeHelperTextConfig = Object.assign(
+        {},
+        this.degreeHelperTextConfig,
+        { text: "" }
+      );
+      this.distanceHelperInputStyle = "left:0px;top:-40px;";
+    },
     /**
-     * 完成布尔运算变换
+     * 完成 temp 与现有多边形的布尔运算变换
      */
     convertTemp() {
       if (this.shapeMode === "single" || this.shapeCoordinates === null) {
         return;
       }
-      if (this.shapeMode === "union") {
-        this.tempShapeCoordinates = martinez.union(
-          this.shapeCoordinates,
-          this.tempShapeCoordinates
-        );
-      } else if (this.shapeMode === "intersection") {
-        this.tempShapeCoordinates = martinez.intersection(
-          this.shapeCoordinates,
-          this.tempShapeCoordinates
-        );
-      } else if (this.shapeMode === "diff") {
-        this.tempShapeCoordinates = martinez.diff(
-          this.shapeCoordinates,
-          this.tempShapeCoordinates
-        );
-      } else if (this.shapeMode === "xor") {
-        this.tempShapeCoordinates = martinez.xor(
-          this.shapeCoordinates,
-          this.tempShapeCoordinates
-        );
-      }
-      this.tempShapeCoordinates = this.formatMartinezBool(
-        this.tempShapeCoordinates
+      this.tempShapeCoordinates = clipperUtil.coordinatesPolygonClipper(
+        this.shapeCoordinates,
+        this.tempShapeCoordinates,
+        this.shapeMode
       );
     },
     /**
@@ -1223,20 +1241,15 @@ export default {
      */
     replaceTemp() {
       // 保存当前主控制区
-      this.beforeShapeCoordinates = utils.arraySimpleDeepCopy(
+      this.beforeShapeCoordinates = toolUtil.arraySimpleDeepCopy(
         this.shapeCoordinates
       );
       // 替换temp为主控制区
-      this.shapeCoordinates = utils.arraySimpleDeepCopy(
+      this.shapeCoordinates = toolUtil.arraySimpleDeepCopy(
         this.tempShapeCoordinates
       );
       this.shapeConfig = Object.assign({}, this.shapeConfig, {
-        sceneFunc: utils.generateSceneFunc(
-          this.shapeCoordinates,
-          this.canvasScale,
-          this.canvasWidth,
-          this.canvasHeight
-        ),
+        sceneFunc: this.generateSceneFunc(this.shapeCoordinates),
       });
       // temp置空
       this.tempShapeCoordinates = [];
@@ -1247,16 +1260,11 @@ export default {
     undo() {
       if (this.beginDraw) return;
       if (this.beforeShapeCoordinates === null) return;
-      this.shapeCoordinates = utils.arraySimpleDeepCopy(
+      this.shapeCoordinates = toolUtil.arraySimpleDeepCopy(
         this.beforeShapeCoordinates
       );
       this.shapeConfig = Object.assign({}, this.shapeConfig, {
-        sceneFunc: utils.generateSceneFunc(
-          this.shapeCoordinates,
-          this.canvasScale,
-          this.canvasWidth,
-          this.canvasHeight
-        ),
+        sceneFunc: this.generateSceneFunc(this.shapeCoordinates),
       });
       this.beforeShapeCoordinates = null;
     },
@@ -1273,16 +1281,12 @@ export default {
       this.currentMap = mapId;
       this.currentFloor = floorId;
       this.basicShapeCoordinates =
-        utils.arraySimpleDeepCopy(buildingCoordinates);
-      this.beforeShapeCoordinates = utils.arraySimpleDeepCopy(floorCoordinates);
-      this.shapeCoordinates = utils.arraySimpleDeepCopy(floorCoordinates);
+        toolUtil.arraySimpleDeepCopy(buildingCoordinates);
+      this.beforeShapeCoordinates =
+        toolUtil.arraySimpleDeepCopy(floorCoordinates);
+      this.shapeCoordinates = toolUtil.arraySimpleDeepCopy(floorCoordinates);
       this.shapeConfig = Object.assign({}, this.shapeConfig, {
-        sceneFunc: utils.generateSceneFunc(
-          this.shapeCoordinates,
-          this.canvasScale,
-          this.canvasWidth,
-          this.canvasHeight
-        ),
+        sceneFunc: this.generateSceneFunc(this.shapeCoordinates),
       });
     },
     /**
@@ -1290,90 +1294,73 @@ export default {
      */
     setWallShapeCoordinates(
       wallThick,
-      wallGeometry,
-      wallInsideGeometry,
+      wallCoordinates,
+      wallInsideCoordinates,
       mapId,
       floorId
     ) {
+      this.wallDrawHelperVisible = true;
       this.cursorPointVisible = true;
+      this.wallThick = wallThick;
       this.currentMap = mapId;
       this.currentFloor = floorId;
-      // 获取实际墙体的形状
-      let wallCoordinates = utils.generateWallGeometryObject(
-        wallGeometry,
-        wallThick
-      ).coordinates;
-      // 计算墙体向量集
-      this.wallVectors.splice(
-        0,
-        this.wallVectors.length,
-        ...utils.getCoordinatesVectors(wallGeometry.coordinates)
-      );
-      // 渲染当前墙体形状
-      this.beforeShapeCoordinates = utils.arraySimpleDeepCopy(wallCoordinates);
-      this.shapeCoordinates = utils.arraySimpleDeepCopy(wallCoordinates);
-      this.shapeConfig = Object.assign({}, this.shapeConfig, {
-        sceneFunc: utils.generateSceneFunc(
-          this.shapeCoordinates,
-          this.canvasScale,
-          this.canvasWidth,
-          this.canvasHeight
-        ),
-      });
-    },
-    /**
-     * 更新变形状态
-     */
-    updateTransformer() {
-      // const transformerNode = this.$refs.transformer.getNode();
-      // // 若存在被选中的对象则添加变形控件，否则移除
-      // if (this.selectedShape) {
-      //   transformerNode.nodes([this.selectedShape]);
-      // } else {
-      //   transformerNode.nodes([]);
-      // }
-    },
-    handleTransform(e) {
-      // let transform = e.target.getTransform().copy();
-      // let { rotation, scaleX, scaleY } = transform.decompose();
-      // console.log(scaleX, scaleY);
-      // let shape = this.$refs.shape.getNode();
-      // shape.rotation(rotation);
-      // shape.scaleX(scaleX);
-      // shape.scaleY(scaleY);
-      // this.coordinatesScale(this.shapeCoordinates, scaleX, scaleY);
-      // this.shapeConfig = Object.assign({}, this.shapeConfig, {
-      //   sceneFunc: this.generateSceneFunc(this.shapeCoordinates),
-      // });
-    },
-    /**
-     * 由于算法的产生问题
-     * 1. 布尔运算后得到线条集，目前仅对该线条集做去除处理
-     * 2. 保证点集的收尾相连
-     * 【待处理】3. 共线点去除
-     */
-    formatMartinezBool(coordinates) {
-      if (utils.countArrayLevel(coordinates) < 4 || coordinates.length === 1)
-        return coordinates;
-      let shapes = [];
-      for (let i = 0, len = coordinates.length; i < len; i++) {
-        let shape = coordinates[i];
-        if (shape[0].length > 3) {
-          shapes.push(shape);
-          // 保证点集的收尾相连
-          for (let j = 0, len2 = shape.length; j < len2; j++) {
-            let points = shape[j];
-            let pointsLength = points.length;
-            if (
-              points[0][0] !== points[pointsLength - 1][0] ||
-              points[0][1] !== points[pointsLength - 1][1]
-            ) {
-              points.push([points[0][0], points[0][1]]);
-            }
-          }
-        }
+      // 复制点集
+      if (typeof wallInsideCoordinates !== "object") {
+        wallInsideCoordinates = [];
       }
-      return shapes;
+      this.wallCoordinates = toolUtil.arraySimpleDeepCopy(wallCoordinates);
+      this.wallInsideCoordinates = toolUtil.arraySimpleDeepCopy(
+        wallInsideCoordinates
+      );
+      // 构造墙体多边形
+      this.buildWallCoordiantes();
+      // 初始区现有功能区，并对功能区进行排序
+      this.areaBeforeCoordinates = toolUtil.arraySimpleDeepCopy(
+        this.areaCoordinates
+      );
+      this.areaCoordinatesListSort(this.areaBeforeCoordinates);
+      // 初始化墙体多边形
+      this.beforeShapeCoordinates = toolUtil.arraySimpleDeepCopy(
+        this.shapeCoordinates
+      );
+    },
+    buildWallCoordiantes() {
+      let { areaMainCoordinates, areaCoordinates, shapeCoordinates } =
+        geometryUtil.generateWallCoordinates(
+          this.wallCoordinates,
+          this.wallInsideCoordinates,
+          this.wallThick
+        );
+      // 清空墙体向量
+      this.wallVectors.splice(0, this.wallVectors.length);
+      // 判断是否存在内墙添加墙体向量
+      if (
+        this.wallInsideCoordinates.length > 0 &&
+        this.wallInsideCoordinates[0].length > 0
+      ) {
+        this.wallVectors.push(
+          ...geometryUtil.getCoordinatesVectors(this.wallInsideCoordinates)
+        );
+      }
+      // 获取墙体中线构造向量
+      let wallMiddle = clipperUtil.coordinatesPolygonOffset(
+        this.wallCoordinates,
+        -this.wallThick / 2
+      );
+      // 添加墙体向量
+      this.wallVectors.push(...geometryUtil.getCoordinatesVectors(wallMiddle));
+      // 渲染墙体
+      this.shapeCoordinates = shapeCoordinates;
+      this.shapeConfig = Object.assign({}, this.shapeConfig, {
+        sceneFunc: this.generateSceneFunc(this.shapeCoordinates),
+      });
+      this.areaCoordinates = areaCoordinates;
+    },
+    setShiftKeyStatus(status) {
+      this.shiftKeyStatus = status;
+    },
+    setAltKeyStatus(status) {
+      this.altKeyStatus = status;
     },
     /**
      * 根据对角点生成相应矩形
@@ -1413,7 +1400,7 @@ export default {
      * 根据数组层数判断当前的点类型
      */
     judgeCoordinatesType(list) {
-      let level = utils.countArrayLevel(list);
+      let level = toolUtil.countArrayLevel(list);
       return level === 3 ? "Polygon" : "MultiPolygon";
     },
     /**
@@ -1437,13 +1424,69 @@ export default {
     coordinatesWiseConvert(coordinates) {
       for (let i = 0, len = coordinates.length; i < len; i++) {
         let points = coordinates[i];
-        if (utils.countArrayLevel(points) > 2) {
+        if (toolUtil.countArrayLevel(points) > 2) {
           this.coordinatesWiseConvert(points);
         } else {
           // 保证点集为逆时针
-          if (utils.judgeClockwise(points)) points.reverse();
+          if (mathUtil.judgeClockwise(points)) points.reverse();
         }
       }
+    },
+    /**
+     * 功能区列表排序
+     */
+    areaCoordinatesListSort(list) {
+      if (list.length === 1) return;
+      list = list.sort(this.areaCoordinatesMinus);
+    },
+    areaCoordinatesMinus(a, b) {
+      let boxA = geometryUtil.getCoordinatesBox(a);
+      let boxB = geometryUtil.getCoordinatesBox(b);
+      let xa = boxA.x;
+      let ya = boxA.y;
+      let xb = boxB.x;
+      let yb = boxB.y;
+      if (!this.similarNumber(ya, yb)) return ya - yb;
+      if (!this.similarNumber(xa, xb)) return xa - xb;
+      xa = boxA.x + boxA.width;
+      ya = boxA.y + boxA.height;
+      xb = boxB.x + boxB.width;
+      yb = boxB.y + boxB.height;
+      if (!this.similarNumber(ya, yb)) return ya - yb;
+      if (!this.similarNumber(xa, xb)) return xa - xb;
+      return 0;
+    },
+    similarNumber(a, b) {
+      return Math.abs(a - b) < 0.01;
+    },
+    areaCoordinatesListCompare(c1, c2) {
+      let i = 0;
+      let j = 0;
+      let len1 = c1.length;
+      let len2 = c2.length;
+      let newAreaList = [];
+      let deleteAreaList = [];
+      while (i < len1 && j < len2) {
+        let score = this.areaCoordinatesMinus(c1[i], c2[j]);
+        if (score === 0) {
+          i++;
+          j++;
+        } else if (score < 0) {
+          deleteAreaList.push(c1[i]);
+          i++;
+        } else if (score > 0) {
+          newAreaList.push(c2[j]);
+          j++;
+          continue;
+        }
+      }
+      while (i < len1) {
+        deleteAreaList.push(i++);
+      }
+      while (j < len2) {
+        newAreaList.push(j++);
+      }
+      return { deleteAreaList, newAreaList };
     },
     /**
      * 完成编辑返回按钮
@@ -1465,14 +1508,19 @@ export default {
             type: "success",
             message: "返回页面成功",
           });
-          this.coordinatesWiseConvert(this.shapeCoordinates);
           switch (this.drawMode) {
             case "building": {
+              this.coordinatesWiseConvert(this.shapeCoordinates);
               this.handleBuildingFinishBack();
               break;
             }
             case "floor": {
+              this.coordinatesWiseConvert(this.shapeCoordinates);
               this.handleFloorFinishBack();
+              break;
+            }
+            case "wall": {
+              this.handleWallFinishBack();
               break;
             }
           }
@@ -1485,10 +1533,10 @@ export default {
         params: {
           geometry: {
             type:
-              utils.countArrayLevel(this.shapeCoordinates) === 3
+              toolUtil.countArrayLevel(this.shapeCoordinates) === 3
                 ? "Polygon"
                 : "MultiPolygon",
-            coordinates: utils.arraySimpleDeepCopy(this.shapeCoordinates),
+            coordinates: toolUtil.arraySimpleDeepCopy(this.shapeCoordinates),
           },
         },
       });
@@ -1497,17 +1545,72 @@ export default {
       this.$router.push({
         name: "mapEditor",
         params: {
+          drawMode: "floor",
           id: this.currentMap,
           floorId: this.currentFloor,
           geometry: {
             type:
-              utils.countArrayLevel(this.shapeCoordinates) === 3
+              toolUtil.countArrayLevel(this.shapeCoordinates) === 3
                 ? "Polygon"
                 : "MultiPolygon",
-            coordinates: utils.arraySimpleDeepCopy(this.shapeCoordinates),
+            coordinates: toolUtil.arraySimpleDeepCopy(this.shapeCoordinates),
           },
         },
       });
+    },
+    handleWallFinishBack() {
+      // 对新的功能区进行排序
+      this.areaCoordinatesListSort(this.areaCoordinates);
+      let { deleteAreaList, newAreaList } = this.areaCoordinatesListCompare(
+        this.areaBeforeCoordinates,
+        this.areaCoordinates
+      );
+      console.log({ deleteAreaList, newAreaList });
+      return;
+      let wallGeometry = {
+        type:
+          toolUtil.countArrayLevel(this.wallCoordinates) === 3
+            ? "Polygon"
+            : "MultiPolygon",
+        coordinates: toolUtil.arraySimpleDeepCopy(this.wallCoordinates),
+      };
+      let wallInsideGeometry = {
+        type:
+          toolUtil.countArrayLevel(this.wallInsideCoordinates) === 3
+            ? "Polygon"
+            : "MultiPolygon",
+        coordinates: toolUtil.arraySimpleDeepCopy(this.wallInsideCoordinates),
+      };
+
+      let areaGeometries = this.areaCoordinates.map((area) => {
+        console.log(toolUtil.arraySimpleDeepCopy(area));
+        return {
+          type:
+            toolUtil.countArrayLevel(area) === 3 ? "Polygon" : "MultiPolygon",
+          coordinates: toolUtil.arraySimpleDeepCopy(area),
+        };
+      });
+
+      return;
+      this.$router.push({
+        name: "mapEditor",
+        params: {
+          id: this.currentMap,
+          floorId: this.currentFloor,
+          drawMode: "wall",
+          wallGeometry,
+          wallInsideGeometry,
+          areaGeometries,
+        },
+      });
+    },
+    generateSceneFunc(coordinates) {
+      return geometryUtil.generateSceneFunc(
+        coordinates,
+        this.canvasScale,
+        this.canvasWidth,
+        this.canvasHeight
+      );
     },
   },
 };

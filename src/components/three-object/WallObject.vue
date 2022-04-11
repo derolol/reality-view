@@ -1,16 +1,9 @@
 <template></template>
 
 <script>
-import {
-  Group,
-  ExtrudeGeometry,
-  MeshLambertMaterial,
-  Mesh,
-  Shape,
-  Path,
-} from "three";
+import { Group, ExtrudeGeometry, MeshLambertMaterial, Mesh } from "three";
 import data from "@/store/data";
-import utils from "@/store/utils";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "wallObject",
   props: {
@@ -34,6 +27,10 @@ export default {
     this.initWallGroup();
     this.initWallMesh();
   },
+  beforeDestroy() {
+    this.scene.remove(this.wallGroup);
+    this.wallGroup.clear();
+  },
   methods: {
     setScene(scene) {
       this.scene = scene;
@@ -44,16 +41,17 @@ export default {
     initWallGeometry() {
       let { zScale } = data.ThreeObjectConfig;
       let wallHeight = this.wallFloorHeight() * zScale;
-      let wallThick = this.wallThickList()[this.wallThick()];
+      let wallThick = this.wallThickList()[this.wallThick() - 1];
       // 构建墙体GeoJSON
-      let geometryObject = utils.generateWallGeometryObject(
-        this.wallGeometryObject(),
+      let { shapeCoordinates } = geometryUtil.generateWallCoordinates(
+        this.wallGeometryObject().coordinates,
+        this.wallInsideGeometryObject().coordinates,
         wallThick
       );
       // 构建shape列表
-      let shapes = utils.getShape(geometryObject);
+      let shapes = geometryUtil.getShapeByCoordinates(shapeCoordinates);
       // 构建墙体形状
-      this.wallGeometry = [];
+      this.wallGeometry.splice(0, this.wallGeometry.length);
       for (let shape of shapes) {
         this.wallGeometry.push(
           new ExtrudeGeometry(shape, {
@@ -81,6 +79,7 @@ export default {
           this.wallMaterial[i % this.wallMaterial.length]
         );
         mesh.position.set(0, 0, 0);
+        mesh.name = `wall${this.wallId()}-three${i}`;
         this.wallMesh.push(mesh);
         this.wallGroup.add(mesh);
       }
@@ -89,17 +88,21 @@ export default {
       this.wallGroup = new Group();
     },
     updateWallFloorHeightChange(height) {
-      this.wallInfo.properties.wall_floor_height = height;
+      this.wallFloorHeight(height);
+
       this.wallGroup.remove(...this.wallMesh);
       this.initWallGeometry();
       this.initWallMesh();
     },
 
-    updateWallGeometry(geometry) {
-      this.wallInfo.geometries[0] = geometry;
+    updateWallGeometry() {
       this.wallGroup.remove(...this.wallMesh);
       this.initWallGeometry();
       this.initWallMesh();
+    },
+
+    updateWallInfo(info) {
+      Object.assign(this.wallInfo.properties, info);
     },
 
     /*******************************************/
@@ -117,9 +120,9 @@ export default {
 
     wallThick(value) {
       if (value !== undefined && value !== null) {
-        this.wallInfo.properties.wall_thick = value;
+        this.wallInfo.properties.wall_thick = +value;
       }
-      return this.wallInfo.properties.wall_thick;
+      return +this.wallInfo.properties.wall_thick;
     },
 
     wallFloorHeight(value) {

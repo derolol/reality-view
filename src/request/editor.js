@@ -92,6 +92,14 @@ const createFloor = async (info) => {
   });
 }
 
+const updateWall = async (wallId, record) => {
+  return instance.request({
+    url: `/${PREFIX}/walls/${wallId}/update`,
+    method: "post",
+    data: record
+  });
+}
+
 export default {
   getMapList,
   createMap,
@@ -104,4 +112,5 @@ export default {
   deleteFloor,
   copyFloor,
   createFloor,
+  updateWall,
 }

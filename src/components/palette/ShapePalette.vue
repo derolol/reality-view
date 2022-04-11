@@ -9,7 +9,7 @@
       <el-col class="palette-tool" :span="6">
         <shape-tool-tab
           :disabledList="disabledList"
-          :allShapeBool="allowShapeBool"
+          :allowShapeBool="allowShapeBool"
           @shapeItemClick="handleShapeItemClick"
           @shapeModeClick="handleShapeModeClick"
         />
@@ -40,6 +40,7 @@
 import fullScreenMixin from "../FullScreenMixin.vue";
 import ShapeToolTab from "./ShapeToolTab.vue";
 import BasicPalette from "./BasicPalette.vue";
+import toolUtil from "@/store/toolUtil";
 
 export default {
   name: "palette",
@@ -57,11 +58,23 @@ export default {
       wallDisabledList: ["rectangle", "regular-polygon", "polygon"],
 
       allowShapeBool: true,
+
+      touchShiftKeyStatusChange: null,
+      touchAltKeyStatusChange: null,
     };
   },
   created() {},
   mounted() {
+    document.addEventListener("keydown", this.handleKeyDown);
     document.addEventListener("keyup", this.handleKeyUp);
+    this.touchShiftKeyStatusChange = toolUtil.debounce(
+      this.$refs.palette.setShiftKeyStatus,
+      100
+    );
+    this.touchAltKeyStatusChange = toolUtil.debounce(
+      this.$refs.palette.setAltKeyStatus,
+      100
+    );
   },
   activated() {
     this.allowShapeBool = true;
@@ -70,6 +83,7 @@ export default {
       this.drawMode = drawMode;
       // 当处于楼层绘制模式时
       if (drawMode === "floor") {
+        this.allowShapeBool = true;
         // 设置当前不能使用的功能
         this.disabledList.splice(
           0,
@@ -85,6 +99,7 @@ export default {
           mapId,
           floorId
         );
+        return;
       }
       // 当处于墙体绘制模式时
       if (drawMode === "wall") {
@@ -100,13 +115,42 @@ export default {
           this.$route.params;
         this.$refs.palette.setWallShapeCoordinates(
           wallThick,
-          wallGeometry,
-          wallInsideGeometry,
+          wallGeometry.coordinates,
+          wallInsideGeometry.coordinates,
           mapId,
           floorId
         );
       }
     }
+
+    // this.drawMode = "wall";
+    // let wallGeometry = {
+    //   type: "Polygon",
+    //   coordinates: [
+    //     [
+    //       [-100, 20],
+    //       [-100, -40],
+    //       [-90, -40],
+    //       [-90, -10],
+    //       [-40, -10],
+    //       [-40, -30],
+    //       [-10, -30],
+    //       [-10, -10],
+    //       [50, -10],
+    //       [50, -40],
+    //       [60, -40],
+    //       [60, 60],
+    //       [20, 60],
+    //       [20, 40],
+    //       [10, 40],
+    //       [10, 60],
+    //       [-70, 60],
+    //       [-70, 20],
+    //       [-100, 20],
+    //     ],
+    //   ],
+    // };
+    // this.$refs.palette.setWallShapeCoordinates(0.4, wallGeometry, [], 42, 58);
   },
   computed: {
     canvasWidth() {
@@ -165,9 +209,24 @@ export default {
       if (e.ctrlKey && e.keyCode === 90) {
         this.$refs.palette.undo();
       }
+      if (e.keyCode === 16) {
+        this.touchShiftKeyStatusChange(false);
+      }
+      if (e.keyCode === 18) {
+        this.touchAltKeyStatusChange(false);
+      }
+    },
+    handleKeyDown(e) {
+      if (e.keyCode === 16) {
+        this.touchShiftKeyStatusChange(true);
+      }
+      if (e.keyCode === 18) {
+        this.touchAltKeyStatusChange(true);
+      }
     },
   },
   beforeDestroy() {
+    document.removeEventListener("keydown", this.handleKeyDown);
     document.removeEventListener("keyup", this.handleKeyUp);
   },
 };

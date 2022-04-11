@@ -3,7 +3,7 @@
 <script>
 import { Group, ExtrudeGeometry, MeshLambertMaterial, Mesh } from "three";
 import data from "@/store/data";
-import utils from "@/store/utils";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "floorObject",
   props: {
@@ -64,10 +64,21 @@ export default {
     getFloorGroup() {
       return this.floorGroup;
     },
+    addAreaGroupObject() {
+      // 功能区对象初始化
+      let areas = this.floorAttachArea();
+      for (let i = 0, len = areas.length; i < len; i++) {
+        this.refs[`area${areas[i]}`][0].initGroupObjects();
+        this.refs[`area${areas[i]}`][0].setScene(this.scene);
+        let area = this.refs[`area${areas[i]}`][0].getAreaGroup();
+        this.floorGroup.add(area);
+      }
+    },
     initFloorGeometry() {
-      let shapes = utils.getShape(this.floorGeometryObject());
-      if (!Array.isArray(shapes)) shapes = [shapes];
-      this.floorGeometry = [];
+      let shapes = geometryUtil.getShapeByCoordinates(
+        this.floorGeometryObject().coordinates
+      );
+      this.floorGeometry.splice(0, this.floorGeometry.length);
       for (let shape of shapes) {
         this.floorGeometry.push(
           new ExtrudeGeometry(shape, {
@@ -93,6 +104,7 @@ export default {
           this.floorMaterial[i % this.floorMaterial.length]
         );
         mesh.position.set(0, 0, -this.floorDepth);
+        mesh.name = `floor${this.floorId()}-three${i}`;
         this.floorMesh.push(mesh);
         this.floorGroup.add(mesh);
       }
@@ -145,7 +157,7 @@ export default {
       Object.assign(this.floorInfo.properties, info);
     },
 
-    flooId(value) {
+    floorId(value) {
       if (value !== undefined && value !== null) {
         this.floorInfo.properties.floor_id = value;
       }

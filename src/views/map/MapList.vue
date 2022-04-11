@@ -253,7 +253,7 @@
 import data from "@/store/data";
 import request from "@/request/editor";
 import MapCard from "./MapCard.vue";
-import utils from "@/store/utils";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "mapList",
   components: { MapCard },
@@ -499,15 +499,15 @@ export default {
     setBuildingGeometryConfig() {
       const showWidth = this.stageConfig.width;
       const showHeight = this.stageConfig.height;
-      const box = utils.getShapeBox(
+      const box = geometryUtil.getCoordinatesBox(
         this.createBuildingModel.buildingGeometry.coordinates
       );
-      const scale = utils.getBoxScale(showWidth, showHeight, box) * 0.9;
+      const scale = geometryUtil.getBoxScale(showWidth, showHeight, box) * 0.9;
       this.buildingGeometryConfig = Object.assign(
         {},
         this.buildingGeometryConfig,
         {
-          sceneFunc: utils.generateSceneFunc(
+          sceneFunc: geometryUtil.generateSceneFunc(
             this.createBuildingModel.buildingGeometry.coordinates,
             scale,
             showWidth,
