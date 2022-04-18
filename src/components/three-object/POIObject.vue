@@ -18,7 +18,6 @@ export default {
   data() {
     return {
       floorGroup: null,
-      scene: null,
 
       poiImage: null,
       srcImageSize: 60,

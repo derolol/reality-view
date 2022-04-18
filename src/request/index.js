@@ -3,7 +3,7 @@ import data from "@/store/data";
 import axios from "axios";
 
 const instance = axios.create({
-  baseURL: data.Server + "api",
+  baseURL: data.Server + "reality/api",
   timeout: 1000,
 });
 

@@ -77,7 +77,7 @@
               <svg-icon
                 iconName="share"
                 iconClass="map-card-icon"
-                @click.native.stop=""
+                @click.native.stop="handleShareClick"
               />
             </el-tooltip>
           </div>
@@ -166,6 +166,12 @@ export default {
         }
         return;
       }
+    },
+    handleShareClick() {
+      this.$router.push({
+        name: "mapPreview",
+        params: { id: this.mapInfo.map_id },
+      });
     },
   },
 };

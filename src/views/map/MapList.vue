@@ -200,11 +200,55 @@
                 slot="prefix"
               >纬度:</span>
             </el-input>
-            <el-button
-              size="medium"
-              type="success"
-              class="building-center-btn"
-            >获取中心经纬度</el-button>
+            <el-popover
+              placement="bottom"
+              width="300"
+              trigger="click"
+            >
+              <baidu-map
+                class="bm-view"
+                center="南昌市南昌大学青山湖区"
+                :zoom="15"
+                @click="getMapClickInfo"
+                @moving="syncCenterAndZoom"
+                @moveend="syncCenterAndZoom"
+                @zoomend="syncCenterAndZoom"
+                :scroll-wheel-zoom="true"
+                :map-click="false"
+              >
+                <bm-view style="width: 300px; height: 300px;"></bm-view>
+                <bm-marker
+                  :position="{lng:createBuildingModel.buildingCenterLng,lat:createBuildingModel.buildingCenterLat}"
+                  :dragging="true"
+                  animation="BMAP_ANIMATION_BOUNCE"
+                >
+                </bm-marker>
+                <bm-control :offset="{ width: '100px', height: '100px' }">
+                  <bm-auto-complete
+                    v-model="searchKeyWord"
+                    :sugStyle="{ zIndex: 999999 }"
+                  >
+                    <el-input
+                      type="text"
+                      placeholder="请输入搜索关键字"
+                      v-model="searchKeyWord"
+                    />
+                  </bm-auto-complete>
+                </bm-control>
+                <bm-local-search
+                  :keyword="searchKeyWord"
+                  :auto-viewport="true"
+                  style="display: none;"
+                >
+                </bm-local-search>
+              </baidu-map>
+              <el-button
+                slot="reference"
+                size="medium"
+                type="success"
+                class="building-center-btn"
+              >获取中心经纬度</el-button>
+            </el-popover>
           </div>
         </el-form-item>
         <el-form-item label="建筑楼层高度">
@@ -333,6 +377,8 @@ export default {
         buildingGeometry: {},
         buildingAccessLevel: 1,
       },
+      searchKeyWord: "",
+      zoom: 15,
       stageConfig: {
         width: 100,
         height: 60,
@@ -677,6 +723,18 @@ export default {
       }
     },
     handleBuildingFloorHeightChange() {},
+
+    getMapClickInfo: function (e) {
+      this.createBuildingModel.buildingCenterLng = e.point.lng;
+      this.createBuildingModel.buildingCenterLat = e.point.lat;
+    },
+
+    syncCenterAndZoom(e) {
+      const { lng, lat } = e.target.getCenter();
+      this.createBuildingModel.buildingCenterLng = lng;
+      this.createBuildingModel.buildingCenterLat = lat;
+      this.zoom = e.target.zoom;
+    },
   },
 };
 </script>

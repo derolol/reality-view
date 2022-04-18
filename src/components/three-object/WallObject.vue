@@ -14,7 +14,6 @@ export default {
   },
   data() {
     return {
-      scene: null,
       wallGeometry: [],
       wallMaterial: [],
       wallMesh: [],

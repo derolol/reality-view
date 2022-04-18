@@ -60,6 +60,11 @@ const routes = [
         component: () => import('@/views/editor/MapEditor.vue'),
       },
       {
+        path: 'maps/:id/preview',
+        name: 'mapPreview',
+        component: () => import('@/views/map/MapPreview.vue'),
+      },
+      {
         path: 'palette',
         name: 'palette',
         component: () => import('@/components/palette/ShapePalette.vue'),
@@ -86,13 +91,17 @@ router.beforeEach(async (to, from, next) => {
   }
   // 重新设置用户信息到 Vuex 中
   const userInfo = JSON.parse(localStorage.getItem("reality_user_info"));
-  store.commit("setUser", userInfo);
+  if (userInfo !== null) {
+    store.commit("setUser", userInfo);
+  }
+  // 判断是否从地图编辑器到地图列表页面
   if (from.name === "mapEditor" && to.name === "maps" && !from.meta.allowNext) {
     router.replace(from);
     from.meta.saveData(320, 200);
     from.meta.to = to;
     return;
   }
+  // 路由放行
   next();
 })
 
