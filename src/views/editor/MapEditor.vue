@@ -74,6 +74,24 @@
     <!-- ------------------------------------------------------
     ###########################################################
          
+                            返回按钮
+    
+    ###########################################################
+    ------------------------------------------------------- -->
+
+    <div
+      class="back-button-container"
+      :style="{ right: `${fullScreenWidth * (1 - canvasScale) + 50}px` }"
+    >
+      <el-button
+        type="primary"
+        @click="handleReturnMapList"
+      >返回地图列表</el-button>
+    </div>
+
+    <!-- ------------------------------------------------------
+    ###########################################################
+         
                             楼层选择器
     
     ###########################################################
@@ -277,11 +295,56 @@
                   >纬度:</span>
                 </el-input>
               </div>
-              <el-button
-                size="medium"
-                type="success"
-                class="building-center-btn"
-              >获取中心经纬度</el-button>
+
+              <el-popover
+                placement="bottom"
+                width="300"
+                trigger="click"
+              >
+                <baidu-map
+                  class="bm-view"
+                  center="南昌市南昌大学青山湖区"
+                  :zoom="15"
+                  @click="getMapClickInfo"
+                  @moving="syncCenterAndZoom"
+                  @moveend="syncCenterAndZoom"
+                  @zoomend="syncCenterAndZoom"
+                  :scroll-wheel-zoom="true"
+                  :map-click="false"
+                >
+                  <bm-view style="width: 300px; height: 300px;"></bm-view>
+                  <bm-marker
+                    :position="{lng:editBuildingModel.buildingCenterLng,lat:editBuildingModel.buildingCenterLat}"
+                    :dragging="true"
+                    animation="BMAP_ANIMATION_BOUNCE"
+                  >
+                  </bm-marker>
+                  <bm-control :offset="{ width: '100px', height: '100px' }">
+                    <bm-auto-complete
+                      v-model="searchKeyWord"
+                      :sugStyle="{ zIndex: 999999 }"
+                    >
+                      <el-input
+                        type="text"
+                        placeholder="请输入搜索关键字"
+                        v-model="searchKeyWord"
+                      />
+                    </bm-auto-complete>
+                  </bm-control>
+                  <bm-local-search
+                    :keyword="searchKeyWord"
+                    :auto-viewport="true"
+                    style="display: none;"
+                  >
+                  </bm-local-search>
+                </baidu-map>
+                <el-button
+                  slot="reference"
+                  size="medium"
+                  type="success"
+                  class="building-center-btn"
+                >获取中心经纬度</el-button>
+              </el-popover>
             </el-form-item>
             <el-form-item label="建筑楼层高度">
               <el-input
@@ -990,6 +1053,8 @@ export default {
         buildingFloorHeight: 3,
         buildingAccessLevel: 1,
       },
+      searchKeyWord: "",
+      zoom: 15,
       buildingMeshVisiable: false,
 
       currentFloor: 0,
@@ -1611,6 +1676,16 @@ export default {
     handleBuildingMeshVisibleChange(visible) {
       this.buildingRef.updateBuildingMeshVisible(visible);
     },
+    getMapClickInfo: function (e) {
+      this.editBuildingModel.buildingCenterLng = e.point.lng;
+      this.editBuildingModel.buildingCenterLat = e.point.lat;
+    },
+    syncCenterAndZoom(e) {
+      const { lng, lat } = e.target.getCenter();
+      this.editBuildingModel.buildingCenterLng = lng;
+      this.editBuildingModel.buildingCenterLat = lat;
+      this.zoom = e.target.zoom;
+    },
     /**
      * 建筑楼层高度改变
      */
@@ -2148,7 +2223,7 @@ export default {
         y: -showHeight / 2 + (box.y + box.height) * scale + 0.05 * showHeight,
       });
     },
-    handleEditWallDrawerClose() {
+    handleEditWallDrawerClose(done) {
       this.touchEditWallChange(true);
       done();
     },
@@ -2625,6 +2700,13 @@ export default {
       this.touchEditPOIChange(false);
       this.poiRef.updatePOIRes(this.editPOIModel.poiRes);
     },
+
+    /**
+     * 返回地图列表
+     */
+    handleReturnMapList() {
+      this.$router.push({ name: "maps" });
+    },
   },
 };
 </script>
@@ -2848,5 +2930,10 @@ export default {
 
 .el-popover .poi-belong-area-p {
   margin: 4px;
+}
+
+.back-button-container {
+  position: absolute;
+  top: 50px;
 }
 </style>

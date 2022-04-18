@@ -50,7 +50,7 @@ const MapAccessLevelList = [
   },
 ]
 
-const MapTagList = ["室内", "大型商场", "停车场", "医院", "学校", "游戏", "景点"];
+const MapTagList = ["室内", "商业", "公共", "草图", "路线图", "游戏", "地标"];
 
 const BuildingType = {
   100: {
