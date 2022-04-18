@@ -39,11 +39,7 @@ export default {
     };
   },
   created() {},
-  methods: {
-    setScene(scene) {
-      this.scene = scene;
-    },
-  },
+  methods: {},
 };
 </script>
 

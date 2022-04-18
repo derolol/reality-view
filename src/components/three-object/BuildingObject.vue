@@ -2,8 +2,9 @@
 
 <script>
 import { ExtrudeGeometry, MeshLambertMaterial, Mesh, Group } from "three";
-import utils from "@/store/utils";
 import data from "@/store/data";
+import clipperUtil from "@/store/clipperUtil";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "buildingObject",
   props: {
@@ -14,28 +15,29 @@ export default {
   },
   data() {
     return {
-      scene: null,
-      buildingGeometry: null,
+      buildingGeometry: [],
       buildingMaterial: null,
-      buildingMesh: null,
+      buildingMesh: [],
       buildingGroup: null,
+      buildingMeshVisible: false,
     };
   },
   created() {
     this.initBuildingGeometry();
     this.initBuildingMaterial();
-    this.initBuildingMesh();
     this.initBuildingGroup();
+    this.initBuildingMesh();
+    this.updateBuildingMeshVisible(false);
   },
   computed: {
     refs() {
       return this.$store.state.mapObjectRefs;
     },
+    scene() {
+      return this.$store.state.mapScene;
+    },
   },
   methods: {
-    setScene(scene) {
-      this.scene = scene;
-    },
     initGroupObjects() {
       let floors = this.buildingAttachFloor();
       for (let i = 0, len = floors.length; i < len; i++) {
@@ -43,7 +45,6 @@ export default {
         let floor = this.refs[`floor${floors[i]}`][0].getFloorGroup();
         this.buildingGroup.add(floor);
       }
-      this.buildingGroup.add(this.buildingMesh);
     },
     getBuildingGroup() {
       return this.buildingGroup;
@@ -62,12 +63,22 @@ export default {
       let height = this.buildingFloorHeight() * data.ThreeObjectConfig.zScale;
       let depth =
         (max - min + 1) * (height + 2 * data.ThreeObjectConfig.floorMargin);
-      let shape = utils.getShape(this.buildingGeometryObject(), -3);
-      this.buildingGeometry = new ExtrudeGeometry(shape, {
-        steps: 1,
-        depth,
-        bevelEnabled: false,
-      });
+      // 扩张建筑点集
+      let scaleCoordinates = clipperUtil.coordinatesPolygonOffset(
+        this.buildingGeometryObject().coordinates,
+        3
+      );
+      let shapes = geometryUtil.getShapeByCoordinates(scaleCoordinates);
+      this.buildingGeometry.splice(0, this.buildingGeometry.length);
+      for (let shape of shapes) {
+        this.buildingGeometry.push(
+          new ExtrudeGeometry(shape, {
+            steps: 1,
+            depth,
+            bevelEnabled: false,
+          })
+        );
+      }
     },
     initBuildingMaterial() {
       this.buildingMaterial = new MeshLambertMaterial({
@@ -82,12 +93,16 @@ export default {
       let z =
         min * (height + 2 * data.ThreeObjectConfig.floorMargin) -
         data.ThreeObjectConfig.floorMargin;
-      this.buildingMesh = new Mesh(
-        this.buildingGeometry,
-        this.buildingMaterial
-      );
-      this.buildingMesh.position.set(0, 0, z);
-      this.buildingMesh.renderOrder = 1;
+      this.buildingMesh.splice(0, this.buildingMesh.length);
+      for (let i = 0, len = this.buildingGeometry.length; i < len; i++) {
+        let mesh = new Mesh(this.buildingGeometry[i], this.buildingMaterial);
+        mesh.position.set(0, 0, z);
+        mesh.renderOrder = 2;
+        mesh.name = `building${this.buildingId()}-three${mesh.id}`;
+        mesh.visible = false;
+        this.buildingMesh.push(mesh);
+        this.buildingGroup.add(mesh);
+      }
     },
     initBuildingGroup() {
       this.buildingGroup = new Group();
@@ -96,18 +111,18 @@ export default {
      * 控制建筑轮廓的显示与隐藏
      */
     updateBuildingMeshVisible(visible) {
-      this.buildingMesh.visible = visible;
+      if (this.buildingMeshVisible === visible) return;
+      this.buildingMeshVisible = visible;
+      for (let mesh of this.buildingMesh) {
+        mesh.visible = visible;
+      }
     },
     /**
      * 更新建筑楼层高度
      */
     updateBuildingFloorHeightChange(height) {
       this.buildingFloorHeight(height);
-
-      this.buildingGroup.remove(this.buildingMesh);
-      this.initBuildingGeometry();
-      this.initBuildingMesh();
-      this.buildingGroup.add(this.buildingMesh);
+      this.rerenderBuildingMesh();
     },
     /**
      * 建筑内部楼层改变
@@ -115,11 +130,16 @@ export default {
     floorLevelChange(max, min) {
       this.buildingFloorLevelMax(max);
       this.buildingFloorLevelMin(min);
-
-      this.buildingGroup.remove(this.buildingMesh);
+      this.rerenderBuildingMesh();
+    },
+    /**
+     * 重新渲染建筑轮廓
+     */
+    rerenderBuildingMesh() {
+      this.buildingGroup.remove(...this.buildingMesh);
       this.initBuildingGeometry();
       this.initBuildingMesh();
-      this.buildingGroup.add(this.buildingMesh);
+      this.updateBuildingMeshVisible(this.buildingMeshVisible);
     },
 
     /*******************************************/

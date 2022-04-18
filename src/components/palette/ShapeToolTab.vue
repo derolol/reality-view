@@ -258,6 +258,7 @@ export default {
     },
     shapeModeChange(bool) {
       if (bool === "single") return;
+      console.log(this.allowShapeBool);
       if (!this.allowShapeBool) {
         this.currentShapeMode = "single";
         this.$message.info("该绘制模式下布尔运算被禁用");

@@ -9,7 +9,7 @@
       <el-col class="palette-tool" :span="6">
         <shape-tool-tab
           :disabledList="disabledList"
-          :allShapeBool="allowShapeBool"
+          :allowShapeBool="allowShapeBool"
           @shapeItemClick="handleShapeItemClick"
           @shapeModeClick="handleShapeModeClick"
         />
@@ -40,6 +40,7 @@
 import fullScreenMixin from "../FullScreenMixin.vue";
 import ShapeToolTab from "./ShapeToolTab.vue";
 import BasicPalette from "./BasicPalette.vue";
+import toolUtil from "@/store/toolUtil";
 
 export default {
   name: "palette",
@@ -57,11 +58,23 @@ export default {
       wallDisabledList: ["rectangle", "regular-polygon", "polygon"],
 
       allowShapeBool: true,
+
+      touchShiftKeyStatusChange: null,
+      touchAltKeyStatusChange: null,
     };
   },
   created() {},
   mounted() {
+    document.addEventListener("keydown", this.handleKeyDown);
     document.addEventListener("keyup", this.handleKeyUp);
+    this.touchShiftKeyStatusChange = toolUtil.debounce(
+      this.$refs.palette.setShiftKeyStatus,
+      100
+    );
+    this.touchAltKeyStatusChange = toolUtil.debounce(
+      this.$refs.palette.setAltKeyStatus,
+      100
+    );
   },
   activated() {
     this.allowShapeBool = true;
@@ -70,6 +83,7 @@ export default {
       this.drawMode = drawMode;
       // 当处于楼层绘制模式时
       if (drawMode === "floor") {
+        this.allowShapeBool = true;
         // 设置当前不能使用的功能
         this.disabledList.splice(
           0,
@@ -85,6 +99,7 @@ export default {
           mapId,
           floorId
         );
+        return;
       }
       // 当处于墙体绘制模式时
       if (drawMode === "wall") {
@@ -96,12 +111,19 @@ export default {
           ...this.wallDisabledList
         );
         // 设置画板的初始值
-        let { wallThick, wallGeometry, wallInsideGeometry, mapId, floorId } =
-          this.$route.params;
-        this.$refs.palette.setWallShapeCoordinates(
+        let {
           wallThick,
           wallGeometry,
           wallInsideGeometry,
+          areaCoordinatesList,
+          mapId,
+          floorId,
+        } = this.$route.params;
+        this.$refs.palette.setWallShapeCoordinates(
+          wallThick,
+          wallGeometry.coordinates,
+          wallInsideGeometry.coordinates,
+          areaCoordinatesList,
           mapId,
           floorId
         );
@@ -165,9 +187,24 @@ export default {
       if (e.ctrlKey && e.keyCode === 90) {
         this.$refs.palette.undo();
       }
+      if (e.keyCode === 16) {
+        this.touchShiftKeyStatusChange(false, false);
+      }
+      if (e.keyCode === 18) {
+        this.touchAltKeyStatusChange(false, false);
+      }
+    },
+    handleKeyDown(e) {
+      if (e.keyCode === 16) {
+        this.touchShiftKeyStatusChange(false, true);
+      }
+      if (e.keyCode === 18) {
+        this.touchAltKeyStatusChange(false, true);
+      }
     },
   },
   beforeDestroy() {
+    document.removeEventListener("keydown", this.handleKeyDown);
     document.removeEventListener("keyup", this.handleKeyUp);
   },
 };

@@ -2,19 +2,30 @@
   <div class="map-list">
     <div class="map-list-header">
       <div>
-        <el-button type="primary" @click="createMap">创建地图</el-button>
+        <el-button
+          type="primary"
+          @click="createMap"
+        >创建地图</el-button>
         <el-button @click="importDialogVisible = true">导入地图</el-button>
       </div>
-      <el-input class="header-search" placeholder="搜索地图"
-        ><svg-icon
+      <el-input
+        class="header-search"
+        placeholder="搜索地图"
+      >
+        <svg-icon
           slot="prefix"
           iconName="search"
           iconClass="header-search-icon"
-      /></el-input>
+        />
+      </el-input>
     </div>
     <div class="map-list-container">
       <el-row :gutter="20">
-        <el-col :span="6" v-for="map in mapList" :key="'map-card' + map.map_id">
+        <el-col
+          :span="6"
+          v-for="map in mapList"
+          :key="'map-card' + map.map_id"
+        >
           <map-card
             :imagePath="map.map_preview_path"
             :mapInfo="map"
@@ -22,7 +33,11 @@
           ></map-card>
         </el-col>
         <el-col :span="6">
-          <map-card newMap @click.native="createMap"></map-card>
+          <map-card
+            newMap
+            @click.native="createMap"
+          >
+          </map-card>
         </el-col>
       </el-row>
     </div>
@@ -37,7 +52,10 @@
       :visible.sync="createMapDialogVisible"
       :before-close="handleCreateMapClose"
     >
-      <el-form class="create-map-form" label-width="100px">
+      <el-form
+        class="create-map-form"
+        label-width="100px"
+      >
         <el-form-item label="地图名称">
           <el-input
             v-model="createMapModel.mapName"
@@ -71,7 +89,10 @@
             "
             placement="top"
           >
-            <el-button size="medium" @click="createBuilding">
+            <el-button
+              size="medium"
+              @click="createBuilding"
+            >
               <div class="create-map-building">
                 <svg-icon
                   :iconName="mapBuildingUpdated ? 'edit' : 'plus'"
@@ -99,16 +120,21 @@
                   size="medium"
                   :label="level.accessLevel"
                   border
-                  >Level&nbsp;{{ level.accessLevel }}</el-radio
-                >
+                >Level&nbsp;{{ level.accessLevel }}</el-radio>
               </el-tooltip>
             </div>
           </div>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
+      <div
+        slot="footer"
+        class="dialog-footer"
+      >
         <el-button @click="cancelCreateMap">取 消</el-button>
-        <el-button type="primary" @click="confirmCreateMap">确 定</el-button>
+        <el-button
+          type="primary"
+          @click="confirmCreateMap"
+        >确 定</el-button>
       </div>
     </el-dialog>
 
@@ -122,7 +148,10 @@
       :visible.sync="createBuildingDialogVisible"
       :before-close="handleCreateBuildingClose"
     >
-      <el-form class="create-building-form" label-width="100px">
+      <el-form
+        class="create-building-form"
+        label-width="100px"
+      >
         <el-form-item label="建筑名称">
           <el-input
             v-model="createBuildingModel.buildingName"
@@ -157,17 +186,25 @@
               v-model="createBuildingModel.buildingCenterLng"
               size="medium"
             >
-              <span class="input-text-prefix" slot="prefix">经度:</span>
+              <span
+                class="input-text-prefix"
+                slot="prefix"
+              >经度:</span>
             </el-input>
             <el-input
               v-model="createBuildingModel.buildingCenterLat"
               size="medium"
             >
-              <span class="input-text-prefix" slot="prefix">纬度:</span>
+              <span
+                class="input-text-prefix"
+                slot="prefix"
+              >纬度:</span>
             </el-input>
-            <el-button size="medium" type="success" class="building-center-btn"
-              >获取中心经纬度</el-button
-            >
+            <el-button
+              size="medium"
+              type="success"
+              class="building-center-btn"
+            >获取中心经纬度</el-button>
           </div>
         </el-form-item>
         <el-form-item label="建筑楼层高度">
@@ -185,15 +222,17 @@
               class="building-geometry-stage"
             >
               <v-layer>
-                <v-shape ref="shape" :config="buildingGeometryConfig" />
+                <v-shape
+                  ref="shape"
+                  :config="buildingGeometryConfig"
+                />
               </v-layer>
             </v-stage>
             <el-button
               type="primary"
               size="medium"
               @click="handleBuildingGeometryPaint"
-              >建筑轮廓绘制</el-button
-            >
+            >建筑轮廓绘制</el-button>
           </div>
         </el-form-item>
         <el-form-item label="建筑访问级别">
@@ -213,18 +252,21 @@
                   size="medium"
                   :label="level.accessLevel"
                   border
-                  >Level&nbsp;{{ level.accessLevel }}</el-radio
-                >
+                >Level&nbsp;{{ level.accessLevel }}</el-radio>
               </el-tooltip>
             </div>
           </div>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
+      <div
+        slot="footer"
+        class="dialog-footer"
+      >
         <el-button @click="cancelCreateBuilding">取 消</el-button>
-        <el-button type="primary" @click="confirmCreateBuilding"
-          >确 定</el-button
-        >
+        <el-button
+          type="primary"
+          @click="confirmCreateBuilding"
+        >确 定</el-button>
       </div>
     </el-dialog>
 
@@ -233,17 +275,24 @@
       导入地图
       
     -->
-    <el-dialog title="导入地图" :visible.sync="importDialogVisible">
+    <el-dialog
+      title="导入地图"
+      :visible.sync="importDialogVisible"
+    >
       <el-form label-width="100px">
         <el-form-item label="活动名称">
           <el-input autocomplete="off"></el-input>
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
+      <div
+        slot="footer"
+        class="dialog-footer"
+      >
         <el-button @click="importDialogVisible = false">取 消</el-button>
-        <el-button type="primary" @click="importDialogVisible = false"
-          >确 定</el-button
-        >
+        <el-button
+          type="primary"
+          @click="importDialogVisible = false"
+        >确 定</el-button>
       </div>
     </el-dialog>
   </div>
@@ -253,7 +302,7 @@
 import data from "@/store/data";
 import request from "@/request/editor";
 import MapCard from "./MapCard.vue";
-import utils from "@/store/utils";
+import geometryUtil from "@/store/geometryUtil";
 export default {
   name: "mapList",
   components: { MapCard },
@@ -373,19 +422,26 @@ export default {
       }
       let mapRes = map.data.map;
       let mapId = mapRes !== null ? mapRes.map_id : -1;
+      let geometry = this.createBuildingModel.buildingGeometry;
+      let { areaCoordinates } = geometryUtil.generateWallCoordinates(
+        geometry.coordinates,
+        [],
+        0.37
+      );
       let buildingInfo = {
         building_name: this.createBuildingModel.buildingName,
         building_type: this.createBuildingModel.buildingType,
         building_center_lng: this.createBuildingModel.buildingCenterLng,
         building_center_lat: this.createBuildingModel.buildingCenterLat,
         building_floor_height: this.createBuildingModel.buildingFloorHeight,
-        building_geometry: JSON.stringify(
-          this.createBuildingModel.buildingGeometry
-        ),
+        building_geometry: JSON.stringify(geometry),
         building_belong_map: mapId,
         building_attach_floor: JSON.stringify([]),
         building_owner: this.$store.state.currentInfo.user_id,
         building_access_level: this.createBuildingModel.buildingAccessLevel,
+        area_geometry: JSON.stringify(
+          geometryUtil.generateGeoJSONGeometry(areaCoordinates)
+        ),
       };
       const building = await request.createBuilding(buildingInfo);
       if (building.code !== 200) {
@@ -499,15 +555,15 @@ export default {
     setBuildingGeometryConfig() {
       const showWidth = this.stageConfig.width;
       const showHeight = this.stageConfig.height;
-      const box = utils.getShapeBox(
+      const box = geometryUtil.getCoordinatesBox(
         this.createBuildingModel.buildingGeometry.coordinates
       );
-      const scale = utils.getBoxScale(showWidth, showHeight, box) * 0.9;
+      const scale = geometryUtil.getBoxScale(showWidth, showHeight, box) * 0.9;
       this.buildingGeometryConfig = Object.assign(
         {},
         this.buildingGeometryConfig,
         {
-          sceneFunc: utils.generateSceneFunc(
+          sceneFunc: geometryUtil.generateSceneFunc(
             this.createBuildingModel.buildingGeometry.coordinates,
             scale,
             showWidth,

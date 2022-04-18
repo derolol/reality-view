@@ -106,6 +106,17 @@ export default {
     setAnimation(index, status) {
       this.animationControl.splice(index, 1, status);
     },
+    updateFloorMap() {
+      this.floorLevelToId = {};
+      this.floorIdToLevel = {};
+      for (let i = 0, len = this.floors.length; i < len; i++) {
+        let floor = this.floors[i].properties;
+        let id = floor.floor_id;
+        let level = floor.floor_level;
+        this.floorLevelToId[level] = id;
+        this.floorIdToLevel[id] = level;
+      }
+    },
   },
 };
 </script>
