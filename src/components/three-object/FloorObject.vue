@@ -14,7 +14,6 @@ export default {
   },
   data() {
     return {
-      scene: null,
       floorGeometry: [],
       floorMaterial: [],
       floorMesh: [],
@@ -33,15 +32,15 @@ export default {
     refs() {
       return this.$store.state.mapObjectRefs;
     },
+    scene() {
+      return this.$store.state.mapScene;
+    },
   },
   beforeDestroy() {
     this.scene.remove(this.floorGroup);
     this.floorGroup.clear();
   },
   methods: {
-    setScene(scene) {
-      this.scene = scene;
-    },
     initGroupObjects() {
       // 墙体对象初始化
       let wall = this.floorAttachWall();
@@ -57,8 +56,7 @@ export default {
       let pois = this.floorAttachPOI();
       pois = !pois ? [] : pois;
       for (let i = 0, len = pois.length; i < len; i++) {
-        let poi = this.refs[`poi${pois[i]}`][0].getPOIObject();
-        this.floorGroup.add(poi);
+        this.refs[`poi${pois[i]}`][0].setFloorGroup(this.floorGroup);
       }
     },
     getFloorGroup() {
@@ -68,10 +66,26 @@ export default {
       // 功能区对象初始化
       let areas = this.floorAttachArea();
       for (let i = 0, len = areas.length; i < len; i++) {
-        this.refs[`area${areas[i]}`][0].initGroupObjects();
-        this.refs[`area${areas[i]}`][0].setScene(this.scene);
         let area = this.refs[`area${areas[i]}`][0].getAreaGroup();
+        if (area) {
+          this.floorGroup.remove(area);
+          this.floorGroup.add(area);
+          continue;
+        }
+        this.refs[`area${areas[i]}`][0].initGroupObjects();
+        area = this.refs[`area${areas[i]}`][0].getAreaGroup();
         this.floorGroup.add(area);
+      }
+    },
+    addPOIObject() {
+      // POI对象初始化
+      let pois = this.floorAttachPOI();
+      for (let i = 0, len = pois.length; i < len; i++) {
+        console.log(this.$refs);
+        console.log(`poi${pois[i]}`);
+        let poi = this.refs[`poi${pois[i]}`][0].getPOIObject();
+        if (poi !== null) continue;
+        this.refs[`poi${pois[i]}`][0].setFloorGroup(this.floorGroup);
       }
     },
     initFloorGeometry() {
@@ -104,7 +118,7 @@ export default {
           this.floorMaterial[i % this.floorMaterial.length]
         );
         mesh.position.set(0, 0, -this.floorDepth);
-        mesh.name = `floor${this.floorId()}-three${i}`;
+        mesh.name = `floor${this.floorId()}-three${mesh.id}`;
         this.floorMesh.push(mesh);
         this.floorGroup.add(mesh);
       }

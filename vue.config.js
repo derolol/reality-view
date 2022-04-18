@@ -12,6 +12,7 @@ module.exports = defineConfig({
       'vue': 'Vue',
       'element-ui': 'ELEMENT',
       'vue-konva': 'VueKonva',
+      polylabel: '_mapbox_polylabel',
     },
   },
   // scss全局配置

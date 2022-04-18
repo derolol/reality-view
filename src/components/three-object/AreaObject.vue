@@ -7,8 +7,10 @@ import {
   Mesh,
   MeshLambertMaterial,
   DoubleSide,
+  Color,
 } from "three";
 import geometryUtil from "@/store/geometryUtil";
+import data from "@/store/data";
 export default {
   name: "areaObject",
   props: {
@@ -19,11 +21,11 @@ export default {
   },
   data() {
     return {
-      scene: null,
       areaGeometry: [],
       areaMaterial: [],
       areaMesh: [],
       areaGroup: null,
+      colorSet: data.AreaType,
     };
   },
   created() {
@@ -33,6 +35,7 @@ export default {
     this.initAreaMesh();
   },
   beforeDestroy() {
+    this.$store.commit("removeMapAreaMesh", ...this.areaMesh);
     this.scene.remove(this.areaGroup);
     this.areaGroup.clear();
   },
@@ -40,11 +43,11 @@ export default {
     refs() {
       return this.$store.state.mapObjectRefs;
     },
+    scene() {
+      return this.$store.state.mapScene;
+    },
   },
   methods: {
-    setScene(scene) {
-      this.scene = scene;
-    },
     initGroupObjects() {
       let components = this.areaAttachComponent();
       for (let i = 0, len = components.length; i < len; i++) {
@@ -66,31 +69,29 @@ export default {
       }
     },
     initAreaMaterial() {
-      this.areaMaterial.push(
-        new MeshLambertMaterial({
-          color: 0x86e0dd,
-          side: DoubleSide,
-        }),
-        new MeshLambertMaterial({
-          color: 0xe6a23c,
-          side: DoubleSide,
-        }),
-        new MeshLambertMaterial({
-          color: 0xf27b7b,
-          side: DoubleSide,
-        }),
-        new MeshLambertMaterial({
-          color: 0x81a5ed,
-          side: DoubleSide,
-        })
-      );
+      for (let key in this.colorSet) {
+        this.areaMaterial.push(
+          new MeshLambertMaterial({
+            color: this.colorSet[key].color,
+            side: DoubleSide,
+          })
+        );
+      }
     },
     initAreaMesh() {
       this.areaMesh.splice(0, this.areaMesh);
       for (let i = 0, len = this.areaGeometry.length; i < len; i++) {
-        let mesh = new Mesh(this.areaGeometry[i], this.areaMaterial[0]);
+        let mesh = new Mesh(
+          this.areaGeometry[i],
+          this.areaType() == 0 || this.areaType()
+            ? this.areaMaterial[+this.areaType()]
+            : this.areaMaterial[
+                +this.areaId() % Object.keys(this.colorSet).length
+              ]
+        );
         mesh.position.set(0, 0, 0.01);
-        mesh.name = `area${this.areaId()}-three${i}`;
+        mesh.name = `area${this.areaId()}-three${mesh.id}`;
+        this.$store.commit("addMapAreaMesh", mesh);
         this.areaMesh.push(mesh);
         this.areaGroup.add(mesh);
       }
@@ -100,9 +101,19 @@ export default {
     },
     updateAreaGeometry(geometry) {
       this.areaGeometryObject(geometry);
-      this.areaGroup.remove(this.areaMesh);
+      this.rerenderMesh();
+    },
+    rerenderMesh() {
+      this.areaGroup.remove(...this.areaMesh);
+      this.$store.commit("removeMapAreaMesh", ...this.areaMesh);
       this.initAreaGeometry();
       this.initAreaMesh();
+    },
+    setMeshColor(type) {
+      // 功能区类型为过道
+      for (let obj of this.areaMesh) {
+        obj.material.color = new Color(this.colorSet[type].color);
+      }
     },
 
     /*******************************************/
@@ -110,6 +121,10 @@ export default {
     /**            Getter & Setter            **/
     /**                                       **/
     /*******************************************/
+
+    updateAreaInfo(info) {
+      Object.assign(this.areaInfo.properties, info);
+    },
 
     areaId(value) {
       if (value !== undefined && value !== null) {
@@ -220,4 +235,14 @@ export default {
 </script>
 
 <style>
+a {
+  color: #e3dfdf;
+  color: #c2e7fb;
+  color: #ffc6cc;
+  color: #ffd5b8;
+  color: #b4e6e3;
+  color: #bae0c6;
+  color: #d9caf9;
+  color: #f5e9bb;
+}
 </style>

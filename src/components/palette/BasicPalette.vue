@@ -334,7 +334,7 @@ export default {
 
       stickDistance: 0.4,
       closeDistance: 8,
-      wallStickDistance: 6,
+      wallStickDistance: 8,
       stickDegree: [
         [-5, 5, 0],
         [85, 95, 90],
@@ -1296,6 +1296,7 @@ export default {
       wallThick,
       wallCoordinates,
       wallInsideCoordinates,
+      areaCoordinatesList,
       mapId,
       floorId
     ) {
@@ -1314,11 +1315,9 @@ export default {
       );
       // 构造墙体多边形
       this.buildWallCoordiantes();
-      // 初始区现有功能区，并对功能区进行排序
-      this.areaBeforeCoordinates = toolUtil.arraySimpleDeepCopy(
-        this.areaCoordinates
-      );
-      this.areaCoordinatesListSort(this.areaBeforeCoordinates);
+      // 初始区现有功能区
+      this.areaBeforeCoordinates =
+        toolUtil.arraySimpleDeepCopy(areaCoordinatesList);
       // 初始化墙体多边形
       this.beforeShapeCoordinates = toolUtil.arraySimpleDeepCopy(
         this.shapeCoordinates
@@ -1397,13 +1396,6 @@ export default {
       return { x: cursorX, y: cursorY };
     },
     /**
-     * 根据数组层数判断当前的点类型
-     */
-    judgeCoordinatesType(list) {
-      let level = toolUtil.countArrayLevel(list);
-      return level === 3 ? "Polygon" : "MultiPolygon";
-    },
-    /**
      * 偏移形状到可视坐标轴的右下角
      * 用于适应transformer
      */
@@ -1417,76 +1409,6 @@ export default {
           this.coordinatesTranslation(p, offsetX, offsetY);
         }
       }
-    },
-    /**
-     * 保证点集为逆时针
-     */
-    coordinatesWiseConvert(coordinates) {
-      for (let i = 0, len = coordinates.length; i < len; i++) {
-        let points = coordinates[i];
-        if (toolUtil.countArrayLevel(points) > 2) {
-          this.coordinatesWiseConvert(points);
-        } else {
-          // 保证点集为逆时针
-          if (mathUtil.judgeClockwise(points)) points.reverse();
-        }
-      }
-    },
-    /**
-     * 功能区列表排序
-     */
-    areaCoordinatesListSort(list) {
-      if (list.length === 1) return;
-      list = list.sort(this.areaCoordinatesMinus);
-    },
-    areaCoordinatesMinus(a, b) {
-      let boxA = geometryUtil.getCoordinatesBox(a);
-      let boxB = geometryUtil.getCoordinatesBox(b);
-      let xa = boxA.x;
-      let ya = boxA.y;
-      let xb = boxB.x;
-      let yb = boxB.y;
-      if (!this.similarNumber(ya, yb)) return ya - yb;
-      if (!this.similarNumber(xa, xb)) return xa - xb;
-      xa = boxA.x + boxA.width;
-      ya = boxA.y + boxA.height;
-      xb = boxB.x + boxB.width;
-      yb = boxB.y + boxB.height;
-      if (!this.similarNumber(ya, yb)) return ya - yb;
-      if (!this.similarNumber(xa, xb)) return xa - xb;
-      return 0;
-    },
-    similarNumber(a, b) {
-      return Math.abs(a - b) < 0.01;
-    },
-    areaCoordinatesListCompare(c1, c2) {
-      let i = 0;
-      let j = 0;
-      let len1 = c1.length;
-      let len2 = c2.length;
-      let newAreaList = [];
-      let deleteAreaList = [];
-      while (i < len1 && j < len2) {
-        let score = this.areaCoordinatesMinus(c1[i], c2[j]);
-        if (score === 0) {
-          i++;
-          j++;
-        } else if (score < 0) {
-          deleteAreaList.push(c1[i]);
-          i++;
-        } else if (score > 0) {
-          newAreaList.push(c2[j]);
-          j++;
-          continue;
-        }
-      }
-      while (i < len1) {
-        deleteAreaList.push(i++);
-      }
-      while (j < len2) {
-        newAreaList.push(j++);
-      }
-      return { deleteAreaList, newAreaList };
     },
     /**
      * 完成编辑返回按钮
@@ -1510,12 +1432,10 @@ export default {
           });
           switch (this.drawMode) {
             case "building": {
-              this.coordinatesWiseConvert(this.shapeCoordinates);
               this.handleBuildingFinishBack();
               break;
             }
             case "floor": {
-              this.coordinatesWiseConvert(this.shapeCoordinates);
               this.handleFloorFinishBack();
               break;
             }
@@ -1525,19 +1445,15 @@ export default {
             }
           }
         })
-        .catch((err) => {});
+        .catch((err) => {
+          console.log(err);
+        });
     },
     handleBuildingFinishBack() {
       this.$router.push({
         name: "maps",
         params: {
-          geometry: {
-            type:
-              toolUtil.countArrayLevel(this.shapeCoordinates) === 3
-                ? "Polygon"
-                : "MultiPolygon",
-            coordinates: toolUtil.arraySimpleDeepCopy(this.shapeCoordinates),
-          },
+          geometry: geometryUtil.generateGeoJSONGeometry(this.shapeCoordinates),
         },
       });
     },
@@ -1548,50 +1464,30 @@ export default {
           drawMode: "floor",
           id: this.currentMap,
           floorId: this.currentFloor,
-          geometry: {
-            type:
-              toolUtil.countArrayLevel(this.shapeCoordinates) === 3
-                ? "Polygon"
-                : "MultiPolygon",
-            coordinates: toolUtil.arraySimpleDeepCopy(this.shapeCoordinates),
-          },
+          geometry: geometryUtil.generateGeoJSONGeometry(this.shapeCoordinates),
         },
       });
     },
     handleWallFinishBack() {
       // 对新的功能区进行排序
-      this.areaCoordinatesListSort(this.areaCoordinates);
-      let { deleteAreaList, newAreaList } = this.areaCoordinatesListCompare(
-        this.areaBeforeCoordinates,
-        this.areaCoordinates
+      geometryUtil.areaCoordinatesListSort(this.areaCoordinates);
+      let { deleteAreaIdList, newAreaList } =
+        geometryUtil.areaCoordinatesListCompare(
+          this.areaBeforeCoordinates,
+          this.areaCoordinates
+        );
+      let wallGeometry = geometryUtil.generateGeoJSONGeometry(
+        this.wallCoordinates
       );
-      console.log({ deleteAreaList, newAreaList });
-      return;
-      let wallGeometry = {
-        type:
-          toolUtil.countArrayLevel(this.wallCoordinates) === 3
-            ? "Polygon"
-            : "MultiPolygon",
-        coordinates: toolUtil.arraySimpleDeepCopy(this.wallCoordinates),
+      let wallInsideGeometry = geometryUtil.generateGeoJSONGeometry(
+        this.wallInsideCoordinates
+      );
+      let areaGeometries = {
+        deleteAreaIdList,
+        newAreaList: newAreaList.map((area) =>
+          geometryUtil.generateGeoJSONGeometry(area)
+        ),
       };
-      let wallInsideGeometry = {
-        type:
-          toolUtil.countArrayLevel(this.wallInsideCoordinates) === 3
-            ? "Polygon"
-            : "MultiPolygon",
-        coordinates: toolUtil.arraySimpleDeepCopy(this.wallInsideCoordinates),
-      };
-
-      let areaGeometries = this.areaCoordinates.map((area) => {
-        console.log(toolUtil.arraySimpleDeepCopy(area));
-        return {
-          type:
-            toolUtil.countArrayLevel(area) === 3 ? "Polygon" : "MultiPolygon",
-          coordinates: toolUtil.arraySimpleDeepCopy(area),
-        };
-      });
-
-      return;
       this.$router.push({
         name: "mapEditor",
         params: {

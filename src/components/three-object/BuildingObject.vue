@@ -15,11 +15,11 @@ export default {
   },
   data() {
     return {
-      scene: null,
       buildingGeometry: [],
       buildingMaterial: null,
       buildingMesh: [],
       buildingGroup: null,
+      buildingMeshVisible: false,
     };
   },
   created() {
@@ -27,16 +27,17 @@ export default {
     this.initBuildingMaterial();
     this.initBuildingGroup();
     this.initBuildingMesh();
+    this.updateBuildingMeshVisible(false);
   },
   computed: {
     refs() {
       return this.$store.state.mapObjectRefs;
     },
+    scene() {
+      return this.$store.state.mapScene;
+    },
   },
   methods: {
-    setScene(scene) {
-      this.scene = scene;
-    },
     initGroupObjects() {
       let floors = this.buildingAttachFloor();
       for (let i = 0, len = floors.length; i < len; i++) {
@@ -52,7 +53,6 @@ export default {
       let floors = this.buildingAttachFloor();
       floors.push(floorId);
       this.refs[`floor${floorId}`][0].initGroupObjects();
-      this.refs[`floor${floorId}`][0].setScene(this.scene);
       let floorGroup = this.refs[`floor${floorId}`][0].getFloorGroup();
       this.buildingGroup.add(floorGroup);
     },
@@ -97,8 +97,9 @@ export default {
       for (let i = 0, len = this.buildingGeometry.length; i < len; i++) {
         let mesh = new Mesh(this.buildingGeometry[i], this.buildingMaterial);
         mesh.position.set(0, 0, z);
-        mesh.renderOrder = 1;
-        mesh.name = `building${this.buildingId()}-three${i}`;
+        mesh.renderOrder = 2;
+        mesh.name = `building${this.buildingId()}-three${mesh.id}`;
+        mesh.visible = false;
         this.buildingMesh.push(mesh);
         this.buildingGroup.add(mesh);
       }
@@ -110,6 +111,8 @@ export default {
      * 控制建筑轮廓的显示与隐藏
      */
     updateBuildingMeshVisible(visible) {
+      if (this.buildingMeshVisible === visible) return;
+      this.buildingMeshVisible = visible;
       for (let mesh of this.buildingMesh) {
         mesh.visible = visible;
       }
@@ -119,10 +122,7 @@ export default {
      */
     updateBuildingFloorHeightChange(height) {
       this.buildingFloorHeight(height);
-
-      this.buildingGroup.remove(this.buildingMesh);
-      this.initBuildingGeometry();
-      this.initBuildingMesh();
+      this.rerenderBuildingMesh();
     },
     /**
      * 建筑内部楼层改变
@@ -130,10 +130,16 @@ export default {
     floorLevelChange(max, min) {
       this.buildingFloorLevelMax(max);
       this.buildingFloorLevelMin(min);
-
-      this.buildingGroup.remove(this.buildingMesh);
+      this.rerenderBuildingMesh();
+    },
+    /**
+     * 重新渲染建筑轮廓
+     */
+    rerenderBuildingMesh() {
+      this.buildingGroup.remove(...this.buildingMesh);
       this.initBuildingGeometry();
       this.initBuildingMesh();
+      this.updateBuildingMeshVisible(this.buildingMeshVisible);
     },
 
     /*******************************************/

@@ -6,10 +6,18 @@
  */
 function debounce(method, wait) {
   let timer;
-  return function (e) {
+  return function () {
     if (timer) clearTimeout(timer);
+    if (arguments[0] === true) {
+      let attrs = Array.from(arguments)
+      attrs.shift();
+      method.apply(null, attrs);
+      return;
+    }
     timer = setTimeout(() => {
-      method.apply(null, [e]);
+      let attrs = Array.from(arguments)
+      attrs.shift();
+      method.apply(null, attrs);
     }, wait);
   }
 }

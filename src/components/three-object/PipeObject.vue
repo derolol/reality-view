@@ -14,6 +14,11 @@ export default {
   created() {
     console.log("pipe");
   },
+  computed: {
+    scene() {
+      return this.$store.state.mapScene;
+    },
+  },
   methods: {
     addObjects(scene) {
       console.log("start pipe add objects");

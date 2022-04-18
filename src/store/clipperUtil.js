@@ -189,11 +189,27 @@ function coordinatesPolygonClipper(subjCoordinates, clipCoordinates, clipType) {
   return clipperPathsToCoordinates(solutionPaths, scale, true);
 }
 
+/**
+ * 计算点集代表的多边形面积
+ * @param {点集} coordinates 
+ * @returns 面积
+ */
+function coordinatesPolygonArea(coordinates) {
+  const scale = 100;
+  // 转换coordinates
+  let paths = coordinatesToClipperPaths(coordinates);
+  // 坐标放缩
+  ClipperLib.JS.ScaleUpPaths(paths, scale);
+  // 计算面积
+  let area = ClipperLib.JS.AreaOfPolygons(paths);
+  return Math.abs(area);
+}
+
 export default {
   coordinatesToClipperPaths,
   clipperPathsToCoordinates,
   coordinatesLineOffset,
   coordinatesPolygonOffset,
   coordinatesPolygonClipper,
-  testClipper,
+  coordinatesPolygonArea,
 }

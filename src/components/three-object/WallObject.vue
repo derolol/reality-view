@@ -31,10 +31,12 @@ export default {
     this.scene.remove(this.wallGroup);
     this.wallGroup.clear();
   },
-  methods: {
-    setScene(scene) {
-      this.scene = scene;
+  computed: {
+    scene() {
+      return this.$store.state.mapScene;
     },
+  },
+  methods: {
     getWallObject() {
       return this.wallGroup;
     },
@@ -65,7 +67,7 @@ export default {
     initWallMaterial() {
       this.wallMaterial.push(
         new MeshLambertMaterial({
-          opacity: 0.8,
+          opacity: 0.6,
           transparent: true,
           color: 0x9f85dd,
         })
@@ -79,7 +81,7 @@ export default {
           this.wallMaterial[i % this.wallMaterial.length]
         );
         mesh.position.set(0, 0, 0);
-        mesh.name = `wall${this.wallId()}-three${i}`;
+        mesh.name = `wall${this.wallId()}-three${mesh.id}`;
         this.wallMesh.push(mesh);
         this.wallGroup.add(mesh);
       }

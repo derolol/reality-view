@@ -107,7 +107,6 @@ function judgeClockwise(points) {
  */
 function checkPointNearVectors(point, vectors, near) {
   let nearVectors = [];
-  let attachVectors = [];
   let nearPoint = [];
   for (let vector of vectors) {
     let { distance, cross } = distanceBetweenPointLine(point, vector);
@@ -124,12 +123,15 @@ function checkPointNearVectors(point, vectors, near) {
       // 若向量之间存在交点，垂足取向量的交点
       let p = vectorsCrossPoint(v, vector);
       if (p.length > 0) {
-        nearPoint = p;
-        nearVectors.push(vector);
+        // 若交点距离现有垂足过远则忽略该交点
+        if (distanceBetweenPoints(p, nearPoint) <= near) {
+          nearPoint = p;
+          nearVectors.push(vector);
+        }
       }
       // 若向量平行则判断是否共线，共线则添加向量
       else {
-        if (distanceBetweenPointLine(nearPoint, vector).distance === 0) {
+        if (distanceBetweenPointLine(nearPoint, vector).distance <= 0.000001) {
           nearVectors.push(vector);
         }
       }
@@ -145,14 +147,34 @@ function checkPointNearVectors(point, vectors, near) {
  * @returns 判断得到的布尔值
  */
 function checkPointOnSegment(point, vector) {
+  // 是否与端点接近
+  if (distanceBetweenPoints(vector[0], point) < 0.000001) {
+    return true;
+  }
+  if (distanceBetweenPoints(vector[1], point) < 0.000001) {
+    return true;
+  }
   let v1 = [point[0] - vector[0][0], point[1] - vector[0][1]];
   let v2 = [vector[1][0] - vector[0][0], vector[1][1] - vector[0][1]];
-  const cond1 = Math.abs(crossProduct(v1, v2)) <= 0.1;
-  const cond2 = (Math.min(vector[0][0], vector[1][0]) <= point[0])
+  let cond = Math.abs(crossProduct(v1, v2)) < 0.001;
+  // 若叉乘结果较大则点不在线段上
+  if (!cond) {
+    return false;
+  }
+  // 若线段垂直或平行仅判断点是否在一个方向的区间内
+  if (Math.abs(vector[0][0] - vector[1][0]) < 0.000001) {
+    return (Math.min(vector[0][1], vector[1][1]) <= point[1])
+      && (Math.max(vector[0][1], vector[1][1]) >= point[1]);
+  }
+  if (Math.abs(vector[0][1] - vector[1][1]) < 0.000001) {
+    return (Math.min(vector[0][0], vector[1][0]) <= point[0])
+      && (Math.max(vector[0][0], vector[1][0]) >= point[0]);
+  }
+  // 否则需要保证点在线段为对角线构成的矩形区域内
+  return (Math.min(vector[0][0], vector[1][0]) <= point[0])
     && (Math.max(vector[0][0], vector[1][0]) >= point[0])
     && (Math.min(vector[0][1], vector[1][1]) <= point[1])
     && (Math.max(vector[0][1], vector[1][1]) >= point[1]);
-  return cond1 && cond2;
 }
 
 /**

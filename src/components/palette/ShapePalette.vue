@@ -111,46 +111,24 @@ export default {
           ...this.wallDisabledList
         );
         // 设置画板的初始值
-        let { wallThick, wallGeometry, wallInsideGeometry, mapId, floorId } =
-          this.$route.params;
+        let {
+          wallThick,
+          wallGeometry,
+          wallInsideGeometry,
+          areaCoordinatesList,
+          mapId,
+          floorId,
+        } = this.$route.params;
         this.$refs.palette.setWallShapeCoordinates(
           wallThick,
           wallGeometry.coordinates,
           wallInsideGeometry.coordinates,
+          areaCoordinatesList,
           mapId,
           floorId
         );
       }
     }
-
-    // this.drawMode = "wall";
-    // let wallGeometry = {
-    //   type: "Polygon",
-    //   coordinates: [
-    //     [
-    //       [-100, 20],
-    //       [-100, -40],
-    //       [-90, -40],
-    //       [-90, -10],
-    //       [-40, -10],
-    //       [-40, -30],
-    //       [-10, -30],
-    //       [-10, -10],
-    //       [50, -10],
-    //       [50, -40],
-    //       [60, -40],
-    //       [60, 60],
-    //       [20, 60],
-    //       [20, 40],
-    //       [10, 40],
-    //       [10, 60],
-    //       [-70, 60],
-    //       [-70, 20],
-    //       [-100, 20],
-    //     ],
-    //   ],
-    // };
-    // this.$refs.palette.setWallShapeCoordinates(0.4, wallGeometry, [], 42, 58);
   },
   computed: {
     canvasWidth() {
@@ -210,18 +188,18 @@ export default {
         this.$refs.palette.undo();
       }
       if (e.keyCode === 16) {
-        this.touchShiftKeyStatusChange(false);
+        this.touchShiftKeyStatusChange(false, false);
       }
       if (e.keyCode === 18) {
-        this.touchAltKeyStatusChange(false);
+        this.touchAltKeyStatusChange(false, false);
       }
     },
     handleKeyDown(e) {
       if (e.keyCode === 16) {
-        this.touchShiftKeyStatusChange(true);
+        this.touchShiftKeyStatusChange(false, true);
       }
       if (e.keyCode === 18) {
-        this.touchAltKeyStatusChange(true);
+        this.touchAltKeyStatusChange(false, true);
       }
     },
   },

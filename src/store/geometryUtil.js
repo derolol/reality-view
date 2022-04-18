@@ -189,7 +189,110 @@ function getBoxScale(showWidth, showHeight, box) {
   return scaleX < scaleY ? scaleX : scaleY;
 }
 
+/**
+ * 根据点集层数回传GeoJSON格式的Geometry
+ * @param {点集} coordinates 
+ */
+function generateGeoJSONGeometry(coordinates) {
+  let type = toolUtil.countArrayLevel(coordinates) === 3 ? "Polygon" : "MultiPolygon";
+  return {
+    type,
+    coordinates: toolUtil.arraySimpleDeepCopy(coordinates),
+  }
+}
+
+/**
+ * 功能区列表排序
+ */
+function areaCoordinatesListSort(areaList) {
+  if (areaList.length === 1) return;
+  areaList = areaList.sort(areaCoordinatesMinus);
+}
+
+/**
+ * 定义功能区点集之间的减法
+ * @param {功能区1} a 
+ * @param {功能区2} b 
+ * @returns 值 < 0 代表 a 小于 b
+ */
+function areaCoordinatesMinus(a, b) {
+  let boxA = getCoordinatesBox(a);
+  let boxB = getCoordinatesBox(b);
+  // 判断矩形左上角顶点
+  let xa = boxA.x;
+  let ya = boxA.y;
+  let xb = boxB.x;
+  let yb = boxB.y;
+  if (!similarNumber(ya, yb)) return ya - yb;
+  if (!similarNumber(xa, xb)) return xa - xb;
+  // 判断矩形右下角顶点
+  xa = boxA.x + boxA.width;
+  ya = boxA.y + boxA.height;
+  xb = boxB.x + boxB.width;
+  yb = boxB.y + boxB.height;
+  if (!similarNumber(ya, yb)) return ya - yb;
+  if (!similarNumber(xa, xb)) return xa - xb;
+  // 判断面积
+  return (
+    clipperUtil.coordinatesPolygonArea(a) -
+    clipperUtil.coordinatesPolygonArea(b)
+  );
+}
+
+/**
+ * 计算两个数值是否相近
+ * @param {数值1} a 
+ * @param {数值2} b 
+ * @returns 
+ */
+function similarNumber(a, b) {
+  return Math.abs(a - b) < 0.001;
+}
+
+/**
+ * 比较两个功能区列表
+ * 列表1为源列表
+ * 列表2为更新列表
+ * 计算得到 删除的功能区和新增的功能区
+ * @param {功能区列表1} c1 带id
+ * @param {功能区列表2} c2 
+ * @returns 计算结果
+ */
+function areaCoordinatesListCompare(c1, c2) {
+  let i = 0;
+  let j = 0;
+  let len1 = c1.length;
+  let len2 = c2.length;
+  let newAreaList = [];
+  let deleteAreaIdList = [];
+  while (i < len1 && j < len2) {
+    let score = areaCoordinatesMinus(c1[i].coordinates, c2[j]);
+    if (score === 0) {
+      i++;
+      j++;
+    } else if (score < 0) {
+      deleteAreaIdList.push(c1[i].area_id);
+      i++;
+    } else if (score > 0) {
+      newAreaList.push(c2[j]);
+      j++;
+      continue;
+    }
+  }
+  while (i < len1) {
+    deleteAreaIdList.push(c1[i++].area_id);
+  }
+  while (j < len2) {
+    newAreaList.push(c2[j++]);
+  }
+  return { deleteAreaIdList, newAreaList };
+}
+
 export default {
+  areaCoordinatesListSort,
+  areaCoordinatesMinus,
+  areaCoordinatesListCompare,
+
   getBoxScale,
   getCoordinatesBox,
   getCoordinatesVectors,
@@ -197,4 +300,6 @@ export default {
 
   getShapeByCoordinates,
   generateSceneFunc,
+
+  generateGeoJSONGeometry,
 }

@@ -100,17 +100,63 @@ const updateWall = async (wallId, record) => {
   });
 }
 
+const updateArea = async (areaId, record) => {
+  return instance.request({
+    url: `/${PREFIX}/areas/${areaId}/update`,
+    method: "post",
+    data: record
+  });
+}
+
+const getPOIResources = async () => {
+  return instance.request({
+    url: `/${PREFIX}/pois/res`,
+    method: "get"
+  })
+}
+
+const createPOI = async (record) => {
+  return instance.request({
+    url: `/${PREFIX}/pois`,
+    method: "post",
+    data: record
+  })
+}
+
+const deletePOI = async (floor, poiId) => {
+  return instance.request({
+    url: `/${PREFIX}/pois/${poiId}/delete`,
+    method: "post",
+    data: {
+      floor
+    }
+  })
+}
+
+const updatePOI = async (poiId, info) => {
+  return instance.request({
+    url: `/${PREFIX}/pois/${poiId}/update`,
+    method: "post",
+    data: { info }
+  })
+}
+
 export default {
   getMapList,
   createMap,
-  createBuilding,
   findMapById,
   uploadMapPreviewImage,
   deleteMap,
+  createBuilding,
   updateBuilding,
   updateFloor,
   deleteFloor,
   copyFloor,
   createFloor,
   updateWall,
+  updateArea,
+  getPOIResources,
+  createPOI,
+  deletePOI,
+  updatePOI,
 }

@@ -5,7 +5,12 @@
       shadow="hover"
       @click.native="jumpEditMap"
     >
-      <el-image class="map-card-preview-image" fit="cover" :src="imageUrl" lazy>
+      <el-image
+        class="map-card-preview-image"
+        fit="cover"
+        :src="imageUrl"
+        lazy
+      >
         <div
           slot="placeholder"
           :class="{
@@ -32,21 +37,47 @@
           </div>
         </div>
       </el-image>
-      <div v-if="!newMap" class="map-card-info">
+      <div
+        v-if="!newMap"
+        class="map-card-info"
+      >
         <div>{{ mapInfo.map_name }}</div>
       </div>
-      <div v-if="!newMap" class="map-card-tool">
+      <div
+        v-if="!newMap"
+        class="map-card-tool"
+      >
         <div class="map-card-tool-container">
           <div
             class="map-tool-icon-container"
             v-for="tool in toolList"
             :key="tool.iconName"
           >
-            <el-tooltip effect="dark" :content="tool.toolDesc" placement="top">
+            <el-tooltip
+              :content="tool.toolDesc"
+              placement="top"
+            >
               <svg-icon
                 :iconName="tool.iconName"
                 iconClass="map-card-icon"
                 @click.native.stop="handleToolClick(tool.iconName)"
+              />
+            </el-tooltip>
+          </div>
+          <div class="map-tool-icon-container">
+            <el-tooltip placement="bottom">
+              <div slot="content">
+                <qriously
+                  value="Hello World!"
+                  foreground="#6949B8"
+                  backgroundAlpha="0.8"
+                  :size="100"
+                />
+              </div>
+              <svg-icon
+                iconName="share"
+                iconClass="map-card-icon"
+                @click.native.stop=""
               />
             </el-tooltip>
           </div>
@@ -82,7 +113,6 @@ export default {
       toolList: {
         edit: { iconName: "edit", toolDesc: "编辑地图信息" },
         delete: { iconName: "delete", toolDesc: "删除地图" },
-        share: { iconName: "share", toolDesc: "分享地图" },
       },
     };
   },
