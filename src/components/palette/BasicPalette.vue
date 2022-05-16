@@ -47,7 +47,10 @@
         </v-group>
       </v-layer>
       <v-layer>
-        <v-shape ref="shape" :config="shapeConfig" />
+        <v-shape
+          ref="shape"
+          :config="shapeConfig"
+        />
         <!-- 
 
           变形器
@@ -61,7 +64,10 @@
           }"
           @transformend="handleTransform"
         /> -->
-        <v-shape ref="tempShape" :config="tempShapeConfig" />
+        <v-shape
+          ref="tempShape"
+          :config="tempShapeConfig"
+        />
 
         <!-- 
 
@@ -104,21 +110,33 @@
           共线提示辅助线
 
          -->
-        <v-shape v-if="colinearHelperVisible" :config="colinearHelperConfig" />
-        <v-shape v-if="colinearHelperVisible" :config="focusLineHelperConfig" />
+        <v-shape
+          v-if="colinearHelperVisible"
+          :config="colinearHelperConfig"
+        />
+        <v-shape
+          v-if="colinearHelperVisible"
+          :config="focusLineHelperConfig"
+        />
 
         <!-- 
 
           绘制自定义形状时的鼠标所在端点
         
         -->
-        <v-circle v-if="cursorPointVisible" :config="cursorPointConfig" />
+        <v-circle
+          v-if="cursorPointVisible"
+          :config="cursorPointConfig"
+        />
         <!-- 
 
           闭合提示点
 
          -->
-        <v-circle v-if="polygonClose" :config="polygonClosePointConfig" />
+        <v-circle
+          v-if="polygonClose"
+          :config="polygonClosePointConfig"
+        />
       </v-layer>
     </v-stage>
 
@@ -127,7 +145,10 @@
       Input 绘制线段长度输入框
 
      -->
-    <div class="distance-helper" :style="distanceHelperInputStyle">
+    <div
+      class="distance-helper"
+      :style="distanceHelperInputStyle"
+    >
       <el-input
         ref="distanceHelperInput"
         v-model="distanceHelperValue"
@@ -148,8 +169,7 @@
         class="canvas-return-button"
         type="primary"
         @click="handleFinishClick"
-        >返回</el-button
-      >
+      >返回</el-button>
     </div>
     <!-- 
 
@@ -163,14 +183,26 @@
           Input
 
          -->
-        <el-form-item label="画布显示宽"
-          ><el-input class="size-input" v-model="canvasShowWidth">
-            <span class="input-text-suffix" slot="suffix">m</span>
+        <el-form-item label="画布显示宽">
+          <el-input
+            class="size-input"
+            v-model="canvasShowWidth"
+          >
+            <span
+              class="input-text-suffix"
+              slot="suffix"
+            >m</span>
           </el-input>
         </el-form-item>
         <el-form-item label="画布显示高">
-          <el-input class="size-input" v-model="canvasShowHeight">
-            <span class="input-text-suffix" slot="suffix">m</span>
+          <el-input
+            class="size-input"
+            v-model="canvasShowHeight"
+          >
+            <span
+              class="input-text-suffix"
+              slot="suffix"
+            >m</span>
           </el-input>
         </el-form-item>
         <!-- 
@@ -218,10 +250,10 @@
 <script>
 const GRID_WIDTH = 10;
 const GRID_NUMBER = 10;
-import toolUtil from "@/store/toolUtil";
-import mathUtil from "@/store/mathUtil";
-import clipperUtil from "@/store/clipperUtil";
-import geometryUtil from "@/store/geometryUtil";
+import toolUtil from "@/utils/toolUtil";
+import mathUtil from "@/utils/mathUtil";
+import clipperUtil from "@/utils/clipperUtil";
+import geometryUtil from "@/utils/geometryUtil";
 export default {
   name: "basicPalette",
   props: {
@@ -625,6 +657,7 @@ export default {
           this.focusLineHelperCoordinates.length > 0 &&
           this.focusLineHelperCoordinates[0].length > 0
         ) {
+          console.log(this.focusLineHelperCoordinates);
           // 满足闭合条件，完成绘制
           this.tempShapeCoordinates[0].push(p);
           this.polygonClose = false;
@@ -634,10 +667,16 @@ export default {
       }
       // 第一个点必须保证在墙上
       if (this.tempShapeCoordinates[0].length === 0) {
+        console.log("judge first point", this.tempShapeCoordinates[0].length);
+        console.log(
+          "focusLineHelperCoordinates",
+          this.focusLineHelperCoordinates
+        );
         if (
           this.focusLineHelperCoordinates.length === 0 ||
           this.focusLineHelperCoordinates[0].length === 0
         ) {
+          console.log(this.focusLineHelperCoordinates);
           this.$message.warning("必须从现有墙体开始绘制");
           return;
         }
@@ -679,11 +718,11 @@ export default {
     handleBuildingMouseMove() {
       // 当前未处于绘制状态
       if (!this.beginDraw) {
-        // 移动跟随光标端点
-        this.cursorPointConfig = Object.assign({}, this.cursorPointConfig, {
-          x: this.getShowX(this.pointX),
-          y: this.getShowY(this.pointY),
-        });
+        // // 移动跟随光标端点
+        // this.cursorPointConfig = Object.assign({}, this.cursorPointConfig, {
+        //   x: this.getShowX(this.pointX),
+        //   y: this.getShowY(this.pointY),
+        // });
         return;
       }
 
@@ -968,26 +1007,33 @@ export default {
     handleFloorMouseMove(e) {
       this.handleBuildingMouseMove(e);
     },
+    /**
+     * 处理处于墙体绘制状态时
+     * 鼠标移动事件
+     */
     handleWallMouseMove(e) {
+      this.judgePointStick();
+
       let { nearVectors, nearPoint } = mathUtil.checkPointNearVectors(
         [this.pointX, this.pointY],
         this.wallVectors,
         this.wallStickDistance / this.canvasScale
+      );
+      // 清空辅助线
+      this.colinearHelperCoordinates.splice(
+        0,
+        this.colinearHelperCoordinates.length
+      );
+      this.focusLineHelperCoordinates.splice(
+        0,
+        this.focusLineHelperCoordinates.length
       );
       // 若点在向量附近则将点移动到垂足
       if (nearVectors.length > 0) {
         this.pointX = nearPoint[0];
         this.pointY = nearPoint[1];
         let p = [this.pointX, this.pointY];
-        // 清空辅助线
-        this.colinearHelperCoordinates.splice(
-          0,
-          this.colinearHelperCoordinates.length
-        );
-        this.focusLineHelperCoordinates.splice(
-          0,
-          this.focusLineHelperCoordinates.length
-        );
+
         // 遍历线段判断点是否在线段内
         for (let v of nearVectors) {
           // 不在线段内需要显示辅助线提示
@@ -1000,10 +1046,6 @@ export default {
             else line = [p, v[1]];
             this.colinearHelperCoordinates.push(line);
           } else {
-            // // 生成内部墙体（需确保点集为逆时针）
-            // this.focusLineHelperCoordinates.push(
-            //   mathUtil.distanceParallelLine(v, this.wallThick)
-            // );
             this.focusLineHelperCoordinates.push(v);
           }
         }
@@ -1096,6 +1138,7 @@ export default {
         this.$emit("endPainting");
       }
       this.beginDraw = false;
+      this.cursorPointVisible = false;
 
       switch (this.shapeType) {
         case "rectangle": {
@@ -1133,6 +1176,7 @@ export default {
         this.$emit("endPainting");
       }
       this.beginDraw = false;
+      this.cursorPointVisible = false;
 
       switch (this.shapeType) {
         case "rectangle": {
@@ -1186,12 +1230,12 @@ export default {
     },
     handleWallFinishDraw(save) {
       if (save) {
-        // 添加新的内部墙体向量
-        this.wallInsideCoordinates.push(this.tempShapeCoordinates);
         // 保存当前主控制区
         this.beforeShapeCoordinates = toolUtil.arraySimpleDeepCopy(
-          this.shapeCoordinates
+          this.wallInsideCoordinates
         );
+        // 清洗并添加新的内部墙体向量
+        this.clearWallIndexLines();
         this.buildWallCoordiantes();
         // temp置空
         this.tempShapeCoordinates = [];
@@ -1206,9 +1250,136 @@ export default {
       this.tempShapeConfig = Object.assign({}, this.tempShapeConfig, {
         sceneFunc: () => {},
       });
+      this.focusLineHelperCoordinates = [];
       // 隐藏绘制提示
       this.clearTipShape();
     },
+    /**
+     * 1清洗新加入的线段变量
+     * -1.1 超出范围的部分
+     * -1.2 共线或覆盖
+     * 2根据交点划分内部墙体
+     */
+    clearWallIndexLines() {
+      // 剪裁超出范围的部分
+      let clipperPath = clipperUtil.coordinatesPolygonSegmentIntersection(
+        this.tempShapeCoordinates,
+        this.wallCoordinates
+      );
+      // 处理覆盖线段
+      let segments = geometryUtil.getCoordinatesVectors(clipperPath);
+      let cleanCoordinates = geometryUtil.cleanOverlapSegments(segments);
+      if (this.wallInsideCoordinates.length === 0) {
+        this.wallInsideCoordinates.push(...cleanCoordinates);
+        return;
+      }
+      // 处理相交线段
+      let srcSegments = geometryUtil.getCoordinatesVectors(
+        this.wallInsideCoordinates
+      );
+      let interSegments = geometryUtil.getCoordinatesVectors(cleanCoordinates);
+      let targetSegments = [];
+      let i = 0;
+      let j = 0;
+      let count = 0;
+      console.log("# 开始遍历需要扫描的线段");
+      while (srcSegments.length > 0) {
+        console.log(
+          `----当前指针位置及长度i:${i}/${srcSegments.length} j:${j}/${interSegments.length}`
+        );
+        count += 1;
+        if (count > 100) break;
+        let p = mathUtil.segmentIntersect(srcSegments[i], interSegments[j]);
+        console.log(
+          "----计算向量",
+          JSON.stringify(srcSegments[i]),
+          JSON.stringify(interSegments[j]),
+          "交点",
+          JSON.stringify(p)
+        );
+        // 记录交点位置
+        let end1 = true;
+        let end2 = true;
+        // 若交点存在
+        if (
+          p &&
+          !mathUtil.judgePointEqual(p, srcSegments[i][0]) &&
+          !mathUtil.judgePointEqual(p, srcSegments[i][1])
+        ) {
+          end1 = false;
+          console.log("交点不在向量1端点");
+        }
+        if (
+          p &&
+          !mathUtil.judgePointEqual(p, interSegments[j][0]) &&
+          !mathUtil.judgePointEqual(p, interSegments[j][1])
+        ) {
+          end2 = false;
+          console.log("交点不在向量2端点");
+        }
+        // 两条线段无交点
+        if ((end1 && end2) || p.length === 0) {
+          console.log("----交点不存在或交点未两线段交点");
+          // 若仅有一条新增线段，则完成该线段的比对
+          if (interSegments.length <= 1) {
+            console.log(
+              "--------添加源线段",
+              JSON.stringify([toolUtil.arraySimpleDeepCopy(srcSegments[i])])
+            );
+            targetSegments.push([toolUtil.arraySimpleDeepCopy(srcSegments[i])]);
+            srcSegments.splice(i, 1);
+          }
+          // 若仍存在多条新增线段，则继续比对
+          else {
+            i += 1;
+          }
+          // 新段与已有线段均不存在交点
+          if (i === srcSegments.length) {
+            console.log(
+              "--------添加相交线段",
+              JSON.stringify([toolUtil.arraySimpleDeepCopy(interSegments[0])])
+            );
+            targetSegments.push([
+              toolUtil.arraySimpleDeepCopy(interSegments[0]),
+            ]);
+            interSegments.splice(0, 1);
+            i = 0;
+            j = 0;
+          }
+          continue;
+        }
+        // 若线段存在交点，则根据交点分割线段
+        console.log("----存在交点");
+        if (!end1) {
+          srcSegments.push([srcSegments[i][0], p], [srcSegments[i][1], p]);
+          console.log(
+            "分割源线段为:",
+            JSON.stringify([srcSegments[i][0], p]),
+            JSON.stringify([srcSegments[i][1], p])
+          );
+          srcSegments.splice(i, 1);
+          console.log("长度", srcSegments.length);
+        }
+        if (!end2) {
+          interSegments.push(
+            [interSegments[j][0], p],
+            [interSegments[j][1], p]
+          );
+          console.log(
+            "分割相交线段为:",
+            JSON.stringify([interSegments[j][0], p]),
+            JSON.stringify([interSegments[j][1], p])
+          );
+          interSegments.splice(j, 1);
+          console.log("长度", srcSegments.length);
+        }
+      }
+      console.log("# 结束扫描", JSON.stringify(targetSegments));
+      this.wallInsideCoordinates = targetSegments;
+    },
+    /**
+     * 隐藏绘制提示工具
+     */
     clearTipShape() {
       this.lineHelperConfig = Object.assign({}, this.lineHelperConfig, {
         sceneFunc: () => {},
@@ -1257,9 +1428,22 @@ export default {
         sceneFunc: () => {},
       });
     },
+    /**
+     * 撤回当前操作
+     */
     undo() {
       if (this.beginDraw) return;
       if (this.beforeShapeCoordinates === null) return;
+      // 墙体需要撤回当前内部墙体的构造
+      if (this.drawMode === "wall") {
+        this.wallInsideCoordinates = toolUtil.arraySimpleDeepCopy(
+          this.beforeShapeCoordinates
+        );
+        this.buildWallCoordiantes();
+        this.beforeShapeCoordinates = null;
+        return;
+      }
+      // 其他可直接撤回图形
       this.shapeCoordinates = toolUtil.arraySimpleDeepCopy(
         this.beforeShapeCoordinates
       );
@@ -1320,7 +1504,7 @@ export default {
         toolUtil.arraySimpleDeepCopy(areaCoordinatesList);
       // 初始化墙体多边形
       this.beforeShapeCoordinates = toolUtil.arraySimpleDeepCopy(
-        this.shapeCoordinates
+        wallInsideCoordinates
       );
     },
     buildWallCoordiantes() {
@@ -1355,11 +1539,23 @@ export default {
       });
       this.areaCoordinates = areaCoordinates;
     },
+    /**
+     * 设置当前Shift键的状态
+     */
     setShiftKeyStatus(status) {
       this.shiftKeyStatus = status;
+      this.$nextTick(() => {
+        this.$refs.distanceHelperInput.select();
+      });
     },
+    /**
+     * 设置当前Alt键的状态
+     */
     setAltKeyStatus(status) {
       this.altKeyStatus = status;
+      this.$nextTick(() => {
+        this.$refs.distanceHelperInput.select();
+      });
     },
     /**
      * 根据对角点生成相应矩形

@@ -2,8 +2,9 @@
 
 <script>
 import { Group, ExtrudeGeometry, MeshLambertMaterial, Mesh } from "three";
-import data from "@/store/data";
-import geometryUtil from "@/store/geometryUtil";
+import data from "@/utils/data";
+import geometryUtil from "@/utils/geometryUtil";
+import { mapState, mapMutations } from "vuex";
 export default {
   name: "wallObject",
   props: {
@@ -20,25 +21,32 @@ export default {
       wallGroup: null,
     };
   },
-  created() {
-    this.initWallGeometry();
-    this.initWallMaterial();
-    this.initWallGroup();
-    this.initWallMesh();
-  },
+  created() {},
   beforeDestroy() {
-    this.scene.remove(this.wallGroup);
-    this.wallGroup.clear();
+    this.clearWallObject();
   },
   computed: {
-    scene() {
-      return this.$store.state.mapScene;
-    },
+    ...mapState("mapEditorStore", {
+      mapScene: (state) => state.mapScene,
+      mapObjectRefs: (state) => state.mapObjectRefs,
+    }),
   },
   methods: {
-    getWallObject() {
-      return this.wallGroup;
+    /**
+     * 渲染墙体对象
+     */
+    addWallObject(previousGroup) {
+      this.previousGroup = previousGroup;
+      this.initWallGeometry();
+      this.initWallMaterial();
+      this.initWallGroup();
+      this.initWallMesh();
+      this.previousGroup.add(this.wallGroup);
     },
+
+    /**
+     * 初始化墙体结构
+     */
     initWallGeometry() {
       let { zScale } = data.ThreeObjectConfig;
       let wallHeight = this.wallFloorHeight() * zScale;
@@ -63,6 +71,10 @@ export default {
         );
       }
     },
+
+    /**
+     * 初始化墙体材质
+     */
     initWallMaterial() {
       this.wallMaterial.push(
         new MeshLambertMaterial({
@@ -72,38 +84,52 @@ export default {
         })
       );
     },
+
+    /**
+     * 初始化墙体组
+     */
+    initWallGroup() {
+      this.wallGroup = new Group();
+    },
+
+    /**
+     * 初始化墙体物体
+     */
     initWallMesh() {
-      this.wallMesh = [];
+      this.wallMesh.splice(0, this.wallMesh.length);
       for (let i = 0, len = this.wallGeometry.length; i < len; i++) {
-        let mesh = new Mesh(
-          this.wallGeometry[i],
-          this.wallMaterial[i % this.wallMaterial.length]
-        );
+        let mesh = new Mesh(this.wallGeometry[i], this.wallMaterial[0]);
         mesh.position.set(0, 0, 0);
-        mesh.name = `wall${this.wallId()}-three${mesh.id}`;
+        mesh.name = `wall${this.wallId()}three${mesh.id}`;
         this.wallMesh.push(mesh);
         this.wallGroup.add(mesh);
       }
     },
-    initWallGroup() {
-      this.wallGroup = new Group();
-    },
-    updateWallFloorHeightChange(height) {
-      this.wallFloorHeight(height);
 
-      this.wallGroup.remove(...this.wallMesh);
-      this.initWallGeometry();
-      this.initWallMesh();
-    },
-
-    updateWallGeometry() {
-      this.wallGroup.remove(...this.wallMesh);
-      this.initWallGeometry();
-      this.initWallMesh();
-    },
-
+    /**
+     * 批量更新墙体信息
+     */
     updateWallInfo(info) {
       Object.assign(this.wallInfo.properties, info);
+    },
+
+    /**
+     * 清除墙体对象
+     */
+    clearWallObject() {
+      this.wallGroup.remove(...this.wallMesh);
+      this.previousGroup.remove(this.wallGroup);
+    },
+
+    /**
+     * 重新渲染物体
+     */
+    rerenderMesh() {
+      this.clearWallObject();
+      this.initWallGeometry();
+      this.initWallMaterial();
+      this.initWallMesh();
+      this.previousGroup.add(this.wallGroup);
     },
 
     /*******************************************/
@@ -129,6 +155,7 @@ export default {
     wallFloorHeight(value) {
       if (value !== undefined && value !== null) {
         this.wallInfo.properties.wall_floor_height = value;
+        this.rerenderMesh();
       }
       return this.wallInfo.properties.wall_floor_height;
     },

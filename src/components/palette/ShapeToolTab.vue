@@ -12,19 +12,45 @@
       @select="handleMenuSelect"
     >
       <el-menu-item index="1">
-        <i><svg-icon iconName="vector" iconClass="menu-icon" /></i>
+        <i>
+          <svg-icon
+            iconName="vector"
+            iconClass="menu-icon"
+          />
+        </i>
         <span slot="title">绘制形状</span>
       </el-menu-item>
       <el-menu-item index="2">
-        <i><svg-icon iconName="setting" iconClass="menu-icon" /></i>
+        <i>
+          <svg-icon
+            iconName="setting"
+            iconClass="menu-icon"
+          />
+        </i>
         <span slot="title">调整属性</span>
       </el-menu-item>
-      <el-menu-item disabled index="3">
-        <i><svg-icon iconName="portfolio" iconClass="menu-icon" /></i>
+      <el-menu-item
+        disabled
+        index="3"
+      >
+        <i>
+          <svg-icon
+            iconName="portfolio"
+            iconClass="menu-icon"
+          />
+        </i>
         <span slot="title">工具箱</span>
       </el-menu-item>
-      <el-menu-item disabled index="4">
-        <i><svg-icon iconName="question" iconClass="menu-icon" /></i>
+      <el-menu-item
+        disabled
+        index="4"
+      >
+        <i>
+          <svg-icon
+            iconName="question"
+            iconClass="menu-icon"
+          />
+        </i>
         <span slot="title">帮助中心</span>
       </el-menu-item>
     </el-menu>
@@ -39,16 +65,25 @@
       1. 形状
 
      -->
-      <div class="palette-control-shape" v-show="menuIndex === '1'">
+      <div
+        class="palette-control-shape"
+        v-show="menuIndex === '1'"
+      >
         <div class="bool-mode-group">
-          <el-radio-group v-model="currentShapeMode" @change="shapeModeChange">
+          <el-radio-group
+            v-model="currentShapeMode"
+            @change="shapeModeChange"
+          >
             <el-radio-button
               v-for="bool in boolItems"
               :key="bool.shape"
               :label="bool.shape"
               :size="medium"
             >
-              <el-tooltip :content="bool.desc" placement="bottom">
+              <el-tooltip
+                :content="bool.desc"
+                placement="bottom"
+              >
                 <svg-icon
                   :iconName="bool.shape"
                   :iconClass="
@@ -61,7 +96,10 @@
             </el-radio-button>
           </el-radio-group>
         </div>
-        <div v-for="group in itemGroup" :key="group.label">
+        <div
+          v-for="group in itemGroup"
+          :key="group.label"
+        >
           <div class="shape-title">{{ group.label }}</div>
           <el-row>
             <el-col
@@ -89,26 +127,37 @@
       2. 属性
 
      -->
-      <div class="palette-setting-attribute" v-show="menuIndex === '2'">
+      <div
+        class="palette-setting-attribute"
+        v-show="menuIndex === '2'"
+      >
         <div v-show="currentShapeType === 'rectangle'">
           <div class="setting-warn-info">设置{{ shapeDesc }}属性</div>
-          <el-form class="setting-form" label-width="40px">
+          <el-form
+            class="setting-form"
+            label-width="40px"
+          >
             <el-form-item label="宽度">
               <el-input v-model="settingRectWidth">
-                <span class="input-text-suffix" slot="suffix">m</span>
+                <span
+                  class="input-text-suffix"
+                  slot="suffix"
+                >m</span>
               </el-input>
             </el-form-item>
             <el-form-item label="高度">
               <el-input v-model="settingRectHeight">
-                <span class="input-text-suffix" slot="suffix">m</span>
+                <span
+                  class="input-text-suffix"
+                  slot="suffix"
+                >m</span>
               </el-input>
             </el-form-item>
             <el-form-item>
               <el-button
                 type="primary"
                 @click="handleShapeItemClick(currentShapeType)"
-                >提交</el-button
-              >
+              >提交</el-button>
             </el-form-item>
           </el-form>
         </div>
@@ -170,7 +219,7 @@ export default {
         },
         xor: {
           shape: "xor",
-          desc: "差集",
+          desc: "异或",
           disabled: false,
         },
       },

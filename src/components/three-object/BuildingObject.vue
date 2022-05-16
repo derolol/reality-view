@@ -2,9 +2,10 @@
 
 <script>
 import { ExtrudeGeometry, MeshLambertMaterial, Mesh, Group } from "three";
-import data from "@/store/data";
-import clipperUtil from "@/store/clipperUtil";
-import geometryUtil from "@/store/geometryUtil";
+import data from "@/utils/data";
+import clipperUtil from "@/utils/clipperUtil";
+import geometryUtil from "@/utils/geometryUtil";
+import { mapState } from "vuex";
 export default {
   name: "buildingObject",
   props: {
@@ -15,6 +16,7 @@ export default {
   },
   data() {
     return {
+      previousGroup: null,
       buildingGeometry: [],
       buildingMaterial: null,
       buildingMesh: [],
@@ -22,40 +24,55 @@ export default {
       buildingMeshVisible: false,
     };
   },
-  created() {
-    this.initBuildingGeometry();
-    this.initBuildingMaterial();
-    this.initBuildingGroup();
-    this.initBuildingMesh();
-    this.updateBuildingMeshVisible(false);
+  created() {},
+  beforeDestroy() {
+    this.clearObject();
   },
   computed: {
-    refs() {
-      return this.$store.state.mapObjectRefs;
-    },
-    scene() {
-      return this.$store.state.mapScene;
-    },
+    ...mapState("mapEditorStore", {
+      mapScene: (state) => state.mapScene,
+      mapObjectRefs: (state) => state.mapObjectRefs,
+    }),
   },
   methods: {
+    /**
+     * 渲染建筑
+     */
+    addBuildingObject(previousGroup) {
+      this.previousGroup = previousGroup;
+      this.initBuildingGeometry();
+      this.initBuildingMaterial();
+      this.initBuildingGroup();
+      this.initBuildingMesh();
+      this.initGroupObjects();
+      this.previousGroup.add(this.buildingGroup);
+    },
+
+    /**
+     * 初始化组对象
+     */
     initGroupObjects() {
+      // 获取楼层对象
       let floors = this.buildingAttachFloor();
       for (let i = 0, len = floors.length; i < len; i++) {
-        this.refs[`floor${floors[i]}`][0].initGroupObjects();
-        let floor = this.refs[`floor${floors[i]}`][0].getFloorGroup();
-        this.buildingGroup.add(floor);
+        // 插入楼层组对象
+        this.mapObjectRefs[`floor${floors[i]}`][0].addFloorObject(
+          this.buildingGroup
+        );
+      }
+      // 获取对象
+      let pipes = this.buildingAttachPipe();
+      for (let i = 0, len = pipes.length; i < len; i++) {
+        // 插入连通区域对象
+        this.mapObjectRefs[`pipe${pipes[i]}`][0].addPipeObject(
+          this.buildingGroup
+        );
       }
     },
-    getBuildingGroup() {
-      return this.buildingGroup;
-    },
-    addFloorGroupObject(floorId) {
-      let floors = this.buildingAttachFloor();
-      floors.push(floorId);
-      this.refs[`floor${floorId}`][0].initGroupObjects();
-      let floorGroup = this.refs[`floor${floorId}`][0].getFloorGroup();
-      this.buildingGroup.add(floorGroup);
-    },
+
+    /**
+     * 初始化建筑架构
+     */
     initBuildingGeometry() {
       // 根据最高和最低楼层计算建筑轮廓高度
       let min = this.buildingFloorLevelMin();
@@ -80,6 +97,10 @@ export default {
         );
       }
     },
+
+    /**
+     * 初始化建筑材质
+     */
     initBuildingMaterial() {
       this.buildingMaterial = new MeshLambertMaterial({
         color: 0xf4f1fb,
@@ -87,6 +108,17 @@ export default {
         transparent: true,
       });
     },
+
+    /**
+     * 初始化建筑组
+     */
+    initBuildingGroup() {
+      this.buildingGroup = new Group();
+    },
+
+    /**
+     * 初始化建筑物体
+     */
     initBuildingMesh() {
       let min = this.buildingFloorLevelMin();
       let height = this.buildingFloorHeight() * data.ThreeObjectConfig.zScale;
@@ -98,15 +130,13 @@ export default {
         let mesh = new Mesh(this.buildingGeometry[i], this.buildingMaterial);
         mesh.position.set(0, 0, z);
         mesh.renderOrder = 2;
-        mesh.name = `building${this.buildingId()}-three${mesh.id}`;
+        mesh.name = `building${this.buildingId()}three${mesh.id}`;
         mesh.visible = false;
         this.buildingMesh.push(mesh);
         this.buildingGroup.add(mesh);
       }
     },
-    initBuildingGroup() {
-      this.buildingGroup = new Group();
-    },
+
     /**
      * 控制建筑轮廓的显示与隐藏
      */
@@ -117,13 +147,7 @@ export default {
         mesh.visible = visible;
       }
     },
-    /**
-     * 更新建筑楼层高度
-     */
-    updateBuildingFloorHeightChange(height) {
-      this.buildingFloorHeight(height);
-      this.rerenderBuildingMesh();
-    },
+
     /**
      * 建筑内部楼层改变
      */
@@ -132,6 +156,7 @@ export default {
       this.buildingFloorLevelMin(min);
       this.rerenderBuildingMesh();
     },
+
     /**
      * 重新渲染建筑轮廓
      */
@@ -141,6 +166,28 @@ export default {
       this.initBuildingMesh();
       this.updateBuildingMeshVisible(this.buildingMeshVisible);
     },
+
+    /**
+     * 新增渲染建筑对象
+     */
+    addFloorGroupObject(floorId) {
+      this.mapObjectRefs[`floor${floorId}`][0].addFloorObject(
+        this.buildingGroup
+      );
+    },
+
+    /**
+     * 新增包含的连通区域对象
+     */
+    addPipeObject(pipeId) {
+      // 插入连通区域对象
+      this.mapObjectRefs[`pipe${pipeId}`][0].addPipeObject(this.buildingGroup);
+    },
+
+    /**
+     * 清除对象
+     */
+    clearObject() {},
 
     /*******************************************/
     /**                                       **/
@@ -184,6 +231,7 @@ export default {
     buildingFloorHeight(value) {
       if (value !== undefined && value !== null) {
         this.buildingInfo.properties.building_floor_height = value;
+        this.rerenderBuildingMesh();
       }
       return this.buildingInfo.properties.building_floor_height;
     },

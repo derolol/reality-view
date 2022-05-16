@@ -16,9 +16,7 @@ function testClipper() {
   for (let i = 0; i < clipTypes.length; i++) {
     let solution_paths = new ClipperLib.Paths();
     cpr.Execute(clipTypes[i], solution_paths, subject_fillType, clip_fillType);
-    // console.log(JSON.stringify(solution_paths));
     clipperPathsToCoordinates(solution_paths, scale)
-    console.log(JSON.stringify(solution_paths));
   }
 }
 
@@ -151,7 +149,7 @@ function coordinatesPolygonOffset(coordinates, offset) {
 
 const clipTypes = {
   union: ClipperLib.ClipType.ctUnion,
-  different: ClipperLib.ClipType.ctDifference,
+  diff: ClipperLib.ClipType.ctDifference,
   xor: ClipperLib.ClipType.ctXor,
   intersection: ClipperLib.ClipType.ctIntersection
 }
@@ -159,7 +157,7 @@ const clipTypes = {
 /**
  * 多边形集合布尔运算
  * union 并
- * different 剪裁
+ * diff 剪裁
  * xor 异或
  * intersection 交
  * @param {主路径} subjCoordinates 
@@ -190,6 +188,40 @@ function coordinatesPolygonClipper(subjCoordinates, clipCoordinates, clipType) {
 }
 
 /**
+ * 计算多边形和线段点击的交集
+ * @param {多边形点集} polygonCoordinates 
+ * @param {线段点集} segmentCoordinates 
+ * @returns 点集
+ */
+function coordinatesPolygonSegmentIntersection(segmentCoordinates, polygonCoordinates) {
+  const scale = 100;
+  // 转换coordinates
+  let segmentPaths = coordinatesToClipperPaths(segmentCoordinates);
+  let polygonPaths = coordinatesToClipperPaths(polygonCoordinates);
+  // 路径缩放
+  ClipperLib.JS.ScaleUpPaths(segmentPaths, scale);
+  ClipperLib.JS.ScaleUpPaths(polygonPaths, scale);
+  // 创建剪裁器
+  var cpr = new ClipperLib.Clipper();
+  // 添加路径
+  cpr.AddPaths(segmentPaths, ClipperLib.PolyType.ptSubject, false);
+  cpr.AddPaths(polygonPaths, ClipperLib.PolyType.ptClip, true);
+  // 设置多边形填充格式为非0填充
+  let subjectFillType = ClipperLib.PolyFillType.pftNegative;
+  let clipFillType = ClipperLib.PolyFillType.pftNonZero;
+  // 创建路径存储容器
+  let solutionPaths = new ClipperLib.PolyTree();
+  cpr.Execute(ClipperLib.ClipType.ctIntersection, solutionPaths, subjectFillType, clipFillType);
+  let resultPaths = ClipperLib.Clipper.OpenPathsFromPolyTree(solutionPaths);
+  for (let i = 0, len = resultPaths.length; i < len; i++) {
+    if (resultPaths[i].length > 2) {
+      resultPaths[i] = ClipperLib.JS.Lighten(resultPaths[i], 0.000001);
+    }
+  }
+  return clipperPathsToCoordinates(resultPaths, scale, false);
+}
+
+/**
  * 计算点集代表的多边形面积
  * @param {点集} coordinates 
  * @returns 面积
@@ -211,5 +243,6 @@ export default {
   coordinatesLineOffset,
   coordinatesPolygonOffset,
   coordinatesPolygonClipper,
+  coordinatesPolygonSegmentIntersection,
   coordinatesPolygonArea,
 }

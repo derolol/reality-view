@@ -141,6 +141,29 @@ const updatePOI = async (poiId, info) => {
   })
 }
 
+const updatePipe = async (pipeId, info) => {
+  return instance.request({
+    url: `/${PREFIX}/pipes/${pipeId}/update`,
+    method: "post",
+    data: { info }
+  })
+}
+
+const createPipe = async (info) => {
+  return instance.request({
+    url: `/${PREFIX}/pipes`,
+    method: "post",
+    data: { info }
+  })
+}
+
+const deletePipe = async (pipeId) => {
+  return instance.request({
+    url: `/${PREFIX}/pipes/${pipeId}/delete`,
+    method: "post",
+  })
+}
+
 export default {
   getMapList,
   createMap,
@@ -159,4 +182,7 @@ export default {
   createPOI,
   deletePOI,
   updatePOI,
+  updatePipe,
+  createPipe,
+  deletePipe,
 }

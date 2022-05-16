@@ -19,18 +19,9 @@
 </template>
 
 <script>
+import { mapState, mapMutations } from "vuex";
 export default {
   name: "FloorChoose",
-  props: {
-    floors: {
-      type: Object,
-      require: true,
-    },
-    currentFloor: {
-      type: Number,
-      require: true,
-    },
-  },
   filters: {
     floorNumberFormat(floor) {
       if (floor === "...") return floor;
@@ -65,9 +56,20 @@ export default {
     },
   },
   computed: {
+    // 楼层信息及当前楼层id
+    ...mapState("mapEditorStore", {
+      floors: (state) => state.floors,
+      currentFloor: (state) => state.currentFloor,
+    }),
+    /**
+     * 当前楼层层号
+     */
     currentFloorLevel() {
       return this.floorIdToLevel[this.currentFloor];
     },
+    /**
+     * 排序后的楼层号
+     */
     floorList() {
       let f = [];
       for (let i = 0, len = this.floors.length; i < len; i++) {
@@ -76,9 +78,13 @@ export default {
       f.sort((a, b) => a - b);
       return f;
     },
+    /**
+     * 展示的楼层列表
+     */
     showFloorList() {
       let oldLength = this.floorList.length;
       let more = oldLength - this.maxShowFloors;
+      // 若楼层数量未超过显示数量，直接显示
       if (more <= 0) return this.floorList;
       let currentIndex = this.floorList.indexOf(this.currentFloor);
       let floors = Array.from(this.floorList);
@@ -99,23 +105,21 @@ export default {
     },
   },
   methods: {
+    ...mapMutations("mapEditorStore", ["setCurrentFloor"]),
+
+    /**
+     * 点击切换楼层
+     */
     handleFloorClick(floor) {
       if (floor === "...") return;
-      this.$emit("floorChange", this.floorLevelToId[floor]);
+      this.$emit("beforeFloorChange");
+      this.setCurrentFloor(this.floorLevelToId[floor]);
     },
+    /**
+     * 设置动画
+     */
     setAnimation(index, status) {
       this.animationControl.splice(index, 1, status);
-    },
-    updateFloorMap() {
-      this.floorLevelToId = {};
-      this.floorIdToLevel = {};
-      for (let i = 0, len = this.floors.length; i < len; i++) {
-        let floor = this.floors[i].properties;
-        let id = floor.floor_id;
-        let level = floor.floor_level;
-        this.floorLevelToId[level] = id;
-        this.floorIdToLevel[id] = level;
-      }
     },
   },
 };

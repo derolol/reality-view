@@ -52,6 +52,6 @@ export default {
 .offset-image {
   background-repeat: no-repeat;
   background-size: 600%;
-  margin: 5px;
+  margin: 2px;
 }
 </style>
