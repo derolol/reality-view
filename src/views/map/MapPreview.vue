@@ -96,8 +96,8 @@ import AreaObject from "@/components/three-object/AreaObject.vue";
 import PoiObject from "@/components/three-object/POIObject.vue";
 import api from "@/request/editor";
 import FloorChoose from "@/views/editor/FloorChoose.vue";
-import data from "@/store/data";
-import geometryUtil from "@/store/geometryUtil";
+import data from "@/utils/data";
+import geometryUtil from "@/utils/geometryUtil";
 export default {
   name: "mapPreview",
   components: {
@@ -201,7 +201,6 @@ export default {
         let height = this.buildingRef.buildingFloorHeight() * zScale;
         let z = level * (height + 2 * floorMargin);
         // 设置当前观察建筑的楼层多边形外矩形
-        this.$refs.render.setFloorHeight(height);
         this.$refs.render.setFloorBox(
           geometryUtil.getCoordinatesBox(
             this.buildingRef.buildingGeometryObject().coordinates

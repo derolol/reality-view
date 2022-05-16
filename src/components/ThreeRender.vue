@@ -21,13 +21,16 @@ import {
   WebGLRenderer,
   CameraHelper,
   AxesHelper,
+  DodecahedronGeometry,
+  Mesh,
+  MeshBasicMaterial,
   GridHelper,
   Euler,
   Raycaster,
 } from "three";
 import TWEEN from "@tweenjs/tween.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import toolUtil from "@/store/toolUtil";
+import toolUtil from "@/utils/toolUtil";
 export default {
   name: "MapRender",
   props: {
@@ -63,7 +66,6 @@ export default {
       focusCurrentArea: null,
       focusCurrentAreaOn: false,
       floorBox: null,
-      floorHeight: null,
       areaBox: null,
 
       mouseMove: false,
@@ -90,22 +92,32 @@ export default {
   },
   mounted() {},
   methods: {
+    /**
+     * 开始渲染
+     */
     startRender() {
+      // 准备三维场景
       this.mapRenderPrepare();
+      // 插入地图元素
       this.addObjects();
+      // 启动渲染
       this.mapRenderAction();
     },
+    /**
+     * 插入地图元素
+     */
     addObjects() {
       if (!this.$slots.default) return;
       for (let el of this.$slots.default) {
         const tag = el.componentOptions.tag;
         if (tag === "building-object") {
-          el.componentInstance.initGroupObjects();
-          let group = el.componentInstance.getBuildingGroup();
-          this.mapScene.add(group);
+          el.componentInstance.addBuildingObject(this.mapScene);
         }
       }
     },
+    /**
+     * 准备三维场景
+     */
     mapRenderPrepare() {
       this.mapSceneInit();
       this.mapRendererInit();
@@ -197,9 +209,20 @@ export default {
      */
     mapHelperInit() {
       // this.mapScene.add(new CameraHelper(this.mapPerspectiveCamera));
-      this.mapScene.add(new CameraHelper(this.mapPerspectiveCamera));
-      this.mapScene.add(new AxesHelper(300));
+      // this.mapScene.add(new CameraHelper(this.mapPerspectiveCamera));
+      // this.mapScene.add(new AxesHelper(300));
       this.mapGridHelperReset(200);
+    },
+    /**
+     * 添加辅助点
+     */
+    mapPointHelper(x, y, z) {
+      const p = new Mesh(
+        new DodecahedronGeometry(0.4, 12),
+        new MeshBasicMaterial({ color: 0xff0000 })
+      );
+      p.position.set(x, y, z);
+      this.mapScene.add(p);
     },
     mapGridHelperReset(width) {
       let number = width / this.mapGridCellSize;
@@ -212,15 +235,15 @@ export default {
       );
       this.mapScene.add(this.mapGridHelper);
     },
+    /**
+     * 楼层外接矩形
+     */
     setFloorBox(box) {
       this.floorBox = box;
       let size = box.width > box.height ? box.width : box.height;
       size =
         Math.floor((size * 1.5) / this.mapGridCellSize) * this.mapGridCellSize;
       this.mapGridHelperReset(size);
-    },
-    setFloorHeight(height) {
-      this.floorHeight = height;
     },
     /**
      * 楼层焦点变化动画
@@ -232,25 +255,27 @@ export default {
       if (this.focusCurrentAreaOn) {
         return;
       }
-      let k = 1.5;
-      let n = 1.5;
-      let fov = this.mapPerspectiveCamera.fov;
-      let aspect = this.mapPerspectiveCamera.aspect;
-      let { x, y, width, height } = this.floorBox;
-      let center = new Vector3(
-        x + width / 2,
-        y + height / 2,
-        z + this.floorHeight
-      );
-      let t = Math.sqrt((height * k * k) / (2 * (k * k + 1)));
-      let r = (t * (this.floorHeight / k + height / 2) * 2) / height;
-      let a =
-        ((width * n) / (2 * aspect * Math.tan((fov / 360) * Math.PI)) + r) /
-        Math.sqrt(1 + k ** 2);
-      // 让边缘显示的最小距离
-      let tan = Math.tan((Math.atan(k) * 180) / Math.PI - fov / 2);
-      let mina = height / 2 / (k - tan);
-      a = a < mina ? mina : a;
+      let k = 1.5; // 视角倾斜角度
+      let n = 1.2; // 最小展示宽度或高度的缩放比例
+      let fov = this.mapPerspectiveCamera.fov; // 竖直方向张角
+      let aspect = this.mapPerspectiveCamera.aspect; // 宽高比
+      let { x, y, width, height } = this.floorBox; // 楼层轮廓外接矩形
+      let center = new Vector3(x + width / 2, y + height / 2, z); // 摄像机聚焦点
+      let tanfov = Math.tan((fov / 360) * Math.PI);
+      let sqrt1k2 = Math.sqrt(1 + k ** 2);
+      let t1 = (k * height) / 2 / sqrt1k2;
+      let t2 = k / sqrt1k2;
+      let a = 0;
+      // 若宽度较大
+      if (width > height) {
+        let d = (width * n) / 2 / aspect;
+        a = (d / tanfov + t1 + t2) / sqrt1k2;
+      }
+      // 若高度较大
+      else {
+        let d = (height * n) / 2 / sqrt1k2;
+        a = (d / tanfov + t1) / sqrt1k2;
+      }
       // 计算目标移动位置
       let destinct = new Vector3(center.x, center.y - k * a, center.z + a);
       // 获取当前摄像机的位置
@@ -285,12 +310,13 @@ export default {
       this.cameraMovePosition = this.mapPerspectiveCamera.position.clone();
       // 初始化移动动画
       this.focusCurrentArea = new TWEEN.Tween(this.cameraMovePosition)
-        .to(new Vector3(x, y - 10, z + 40), 1000)
+        .to(new Vector3(x, y - 10, z + 20), 1000)
         .easing(TWEEN.Easing.Quadratic.InOut);
       // 设置动画更新函数
       this.focusCurrentArea.onUpdate(() => {
         // 设置当前摄像机的位置及其焦点
         this.mapController.target.set(x, y, z);
+        console.log(x, y, z);
         this.mapPerspectiveCamera.position = this.cameraMovePosition.clone();
       });
       // 设置动画完成函数
@@ -321,9 +347,13 @@ export default {
       requestAnimationFrame(this.mapRenderAction);
       this.mapController.update();
       this.mapRenderer.render(this.mapScene, this.mapPerspectiveCamera);
+      // 若此时需要Canvas截图
       if (this.getCanvasImage === true) {
+        // 仅需截一次图
         this.getCanvasImage = false;
+        // 调用获取截图的回调函数
         this.getImageCallback(
+          // Canvas截图
           this.mapRenderer.domElement.toDataURL("image/png")
         );
       }

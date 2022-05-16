@@ -343,10 +343,10 @@
 </template>
 
 <script>
-import data from "@/store/data";
+import data from "@/utils/data";
 import request from "@/request/editor";
 import MapCard from "./MapCard.vue";
-import geometryUtil from "@/store/geometryUtil";
+import geometryUtil from "@/utils/geometryUtil";
 export default {
   name: "mapList",
   components: { MapCard },

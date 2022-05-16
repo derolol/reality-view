@@ -2,8 +2,9 @@
 
 <script>
 import { Group, ExtrudeGeometry, MeshLambertMaterial, Mesh } from "three";
-import data from "@/store/data";
-import geometryUtil from "@/store/geometryUtil";
+import data from "@/utils/data";
+import geometryUtil from "@/utils/geometryUtil";
+import { mapState } from "vuex";
 export default {
   name: "floorObject",
   props: {
@@ -14,6 +15,7 @@ export default {
   },
   data() {
     return {
+      previousGroup: null,
       floorGeometry: [],
       floorMaterial: [],
       floorMesh: [],
@@ -21,73 +23,46 @@ export default {
       floorDepth: 0.2,
     };
   },
-  created() {
-    this.initFloorGeometry();
-    this.initFloorMaterial();
-    this.initFloorGroup();
-    this.initFloorMesh();
-    this.initGroupPosition();
-  },
+  created() {},
   computed: {
-    refs() {
-      return this.$store.state.mapObjectRefs;
-    },
-    scene() {
-      return this.$store.state.mapScene;
-    },
+    ...mapState("mapEditorStore", {
+      mapScene: (state) => state.mapScene,
+      mapObjectRefs: (state) => state.mapObjectRefs,
+    }),
   },
-  beforeDestroy() {
-    this.scene.remove(this.floorGroup);
-    this.floorGroup.clear();
-  },
+  beforeDestroy() {},
   methods: {
-    initGroupObjects() {
-      // 墙体对象初始化
-      let wall = this.floorAttachWall();
-      this.floorGroup.add(this.refs[`wall${wall}`][0].getWallObject());
-      // 功能区对象初始化
-      let areas = this.floorAttachArea();
-      for (let i = 0, len = areas.length; i < len; i++) {
-        this.refs[`area${areas[i]}`][0].initGroupObjects();
-        let area = this.refs[`area${areas[i]}`][0].getAreaGroup();
-        this.floorGroup.add(area);
-      }
-      // POI对象初始化
-      let pois = this.floorAttachPOI();
-      pois = !pois ? [] : pois;
-      for (let i = 0, len = pois.length; i < len; i++) {
-        this.refs[`poi${pois[i]}`][0].setFloorGroup(this.floorGroup);
-      }
+    /**
+     * 渲染楼层
+     */
+    addFloorObject(previousGroup) {
+      this.previousGroup = previousGroup;
+      this.initFloorGeometry();
+      this.initFloorMaterial();
+      this.initFloorGroup();
+      this.initFloorMesh();
+      this.initGroupPosition();
+      this.initGroupObjects();
+      this.previousGroup.add(this.floorGroup);
     },
-    getFloorGroup() {
-      return this.floorGroup;
+
+    /**
+     * 增加渲染功能区
+     */
+    addAreaGroupObject(areaId) {
+      this.mapObjectRefs[`area${areaId}`][0].addAreaObject(this.floorGroup);
     },
-    addAreaGroupObject() {
-      // 功能区对象初始化
-      let areas = this.floorAttachArea();
-      for (let i = 0, len = areas.length; i < len; i++) {
-        let area = this.refs[`area${areas[i]}`][0].getAreaGroup();
-        if (area) {
-          this.floorGroup.remove(area);
-          this.floorGroup.add(area);
-          continue;
-        }
-        this.refs[`area${areas[i]}`][0].initGroupObjects();
-        area = this.refs[`area${areas[i]}`][0].getAreaGroup();
-        this.floorGroup.add(area);
-      }
+
+    /**
+     * 增加渲染POI
+     */
+    addPOIObject(newPOIId) {
+      this.mapObjectRefs[`poi${newPOIId}`][0].setFloorGroup(this.floorGroup);
     },
-    addPOIObject() {
-      // POI对象初始化
-      let pois = this.floorAttachPOI();
-      for (let i = 0, len = pois.length; i < len; i++) {
-        console.log(this.$refs);
-        console.log(`poi${pois[i]}`);
-        let poi = this.refs[`poi${pois[i]}`][0].getPOIObject();
-        if (poi !== null) continue;
-        this.refs[`poi${pois[i]}`][0].setFloorGroup(this.floorGroup);
-      }
-    },
+
+    /**
+     * 初始化楼层结构
+     */
     initFloorGeometry() {
       let shapes = geometryUtil.getShapeByCoordinates(
         this.floorGeometryObject().coordinates
@@ -103,6 +78,10 @@ export default {
         );
       }
     },
+
+    /**
+     * 初始化材质
+     */
     initFloorMaterial() {
       this.floorMaterial.push(
         new MeshLambertMaterial({
@@ -110,6 +89,17 @@ export default {
         })
       );
     },
+
+    /**
+     * 初始化组
+     */
+    initFloorGroup() {
+      this.floorGroup = new Group();
+    },
+
+    /**
+     * 初始化物体
+     */
     initFloorMesh() {
       this.floorMesh = [];
       for (let i = 0, len = this.floorGeometry.length; i < len; i++) {
@@ -118,47 +108,76 @@ export default {
           this.floorMaterial[i % this.floorMaterial.length]
         );
         mesh.position.set(0, 0, -this.floorDepth);
-        mesh.name = `floor${this.floorId()}-three${mesh.id}`;
+        mesh.name = `floor${this.floorId()}three${mesh.id}`;
         this.floorMesh.push(mesh);
         this.floorGroup.add(mesh);
       }
     },
-    initFloorGroup() {
-      this.floorGroup = new Group();
-    },
+
+    /**
+     * 初始化楼层位置
+     */
     initGroupPosition() {
       let level = this.floorLevel();
       let height = this.floorHeight() * data.ThreeObjectConfig.zScale;
       let z = level * (height + 2 * data.ThreeObjectConfig.floorMargin);
       this.floorGroup.position.set(0, 0, z);
     },
-    updateBuildingFloorHeightChange(height) {
-      this.floorHeight(height);
 
-      this.initGroupPosition();
+    /**
+     * 初始化楼层组
+     */
+    initGroupObjects() {
+      // 墙体对象初始化
+      let wall = this.floorAttachWall();
+      this.mapObjectRefs[`wall${wall}`][0].addWallObject(this.floorGroup);
+      // 功能区对象初始化
+      let areas = this.floorAttachArea();
+      for (let i = 0, len = areas.length; i < len; i++) {
+        this.mapObjectRefs[`area${areas[i]}`][0].addAreaObject(this.floorGroup);
+      }
+      // POI对象初始化
+      let pois = this.floorAttachPOI();
+      pois = !pois ? [] : pois;
+      for (let i = 0, len = pois.length; i < len; i++) {
+        this.mapObjectRefs[`poi${pois[i]}`][0].setFloorGroup(this.floorGroup);
+      }
     },
-    floorLevelChange(level) {
-      this.floorLevel(level);
 
-      this.initGroupPosition();
-    },
+    /**
+     * 设置楼层底板是否可见
+     */
     setFloorMeshVisible(visible) {
       for (let i = 0, len = this.floorMesh.length; i < len; i++) {
         this.floorMesh[i].visible = visible;
       }
     },
-    updateFloorGeometry(geometry) {
-      this.floorGeometryObject(geometry);
 
-      this.floorGroup.remove(...this.floorMesh);
-      this.initFloorGeometry();
-      this.initFloorMesh();
-    },
     /**
      * 控制楼层轮廓的显示与隐藏
      */
     setFloorGroupVisible(visible) {
       this.floorGroup.visible = visible;
+    },
+
+    /**
+     * 清除楼层对象
+     */
+    clearObject() {
+      this.previous.remove(this.floorGroup);
+      this.floorGroup.remove(...this.floorMesh);
+    },
+
+    /**
+     * 重新渲染
+     */
+    rerenderObject() {
+      this.clearObject();
+      this.initFloorGeometry();
+      this.initFloorMaterial();
+      this.initFloorMesh();
+      this.initGroupPosition();
+      this.previousGroup.add(this.floorGroup);
     },
 
     /*******************************************/
@@ -186,12 +205,14 @@ export default {
     floorLevel(value) {
       if (value !== undefined && value !== null) {
         this.floorInfo.properties.floor_level = value;
+        this.initGroupPosition();
       }
       return this.floorInfo.properties.floor_level;
     },
     floorHeight(value) {
       if (value !== undefined && value !== null) {
         this.floorInfo.properties.floor_height = value;
+        this.initGroupPosition();
       }
       return this.floorInfo.properties.floor_height;
     },
@@ -258,6 +279,7 @@ export default {
     floorGeometryObject(value) {
       if (value !== undefined && value !== null) {
         this.floorInfo.geometry = value;
+        this.rerenderObject();
       }
       return this.floorInfo.geometry;
     },

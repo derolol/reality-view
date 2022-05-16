@@ -42,6 +42,7 @@ import "@/assets/svg/object/floor.svg";
 import "@/assets/svg/object/area.svg";
 import "@/assets/svg/object/poi.svg";
 import "@/assets/svg/object/pipe.svg";
+import "@/assets/svg/object/component.svg";
 
 Vue.component('svg-icon', SvgIcon);
 Vue.component('svg-text', SvgText);

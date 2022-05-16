@@ -107,34 +107,96 @@ function judgeClockwise(points) {
  */
 function checkPointNearVectors(point, vectors, near) {
   let nearVectors = [];
+  let containVectors = [];
+  let extendVectors = [];
   let nearPoint = [];
+  // 遍历所有向量，获取所有点靠近的向量
   for (let vector of vectors) {
     let { distance, cross } = distanceBetweenPointLine(point, vector);
     // 满足限定的距离条件
     if (distance <= near) {
-      // 若为首次检测到相近向量
-      if (nearPoint.length === 0) {
-        nearPoint = cross;
-        nearVectors.push(vector);
-        continue;
+      // 若垂足在线段上
+      if (checkPointOnSegment(cross, vector)) {
+        containVectors.push({ vector, cross });
       }
-      // 若已有满足条件向量需要进行判断
-      let v = nearVectors[nearVectors.length - 1];
-      // 若向量之间存在交点，垂足取向量的交点
-      let p = vectorsCrossPoint(v, vector);
-      if (p.length > 0) {
-        // 若交点距离现有垂足过远则忽略该交点
-        if (distanceBetweenPoints(p, nearPoint) <= near) {
-          nearPoint = p;
-          nearVectors.push(vector);
-        }
-      }
-      // 若向量平行则判断是否共线，共线则添加向量
+      // 若垂足在延长线上，则保证相同斜率的向量仅有一条
       else {
-        if (distanceBetweenPointLine(nearPoint, vector).distance <= 0.000001) {
-          nearVectors.push(vector);
+        let check = true;
+        for (let info of extendVectors) {
+          let v = info.vector;
+          if (crossProduct([v[0][0] - v[1][0], v[0][1] - v[1][1]], [vector[0][0] - vector[1][0], vector[0][1] - vector[1][1]]) === 0) {
+            check = false;
+            break;
+          }
+        }
+        if (!check) continue;
+        extendVectors.push({ vector, cross });
+      }
+    }
+  }
+  // 检查延长向量是否与在点向量共线
+  let i = 0;
+  let count = 0;
+  while (i < extendVectors.length) {
+    count += 1;
+    if (count > 100) break;
+    for (let j = 0, len2 = containVectors.length; j < len2; j++) {
+      let v1 = extendVectors[i].vector;
+      let v2 = containVectors[j].vector;
+      if (Math.abs(crossProduct([v1[0][0] - v1[1][0], v1[0][1] - v1[1][1]], [v2[0][0] - v2[1][0], v2[0][1] - v2[1][1]])) < 0.0001) {
+        extendVectors.splice(i, 1);
+        break;
+      }
+      else {
+        i += 1;
+        if (i >= extendVectors.length) {
+          break;
         }
       }
+    }
+  }
+  // 遍历点在线段上的向量
+  for (let info of containVectors) {
+    let { vector, cross } = info;
+    // 若未有交点则初始化
+    if (nearPoint.length === 0) {
+      nearPoint = cross;
+      nearVectors.push(vector);
+      continue;
+    }
+    // 若已有交点则判断两线交点是否与原垂足距离较近
+    let p = vectorsCrossPoint(vector, nearVectors[nearVectors.length - 1]);
+    // 若交点距离现有垂足过远则忽略该交点
+    if (distanceBetweenPoints(p, nearPoint) <= near) {
+      nearPoint = p;
+      nearVectors.push(vector);
+    }
+  }
+  for (let info of extendVectors) {
+    let { vector, cross } = info;
+    // 如果包含点的向量列表不为空，则仅需判断点到向量垂足与当前垂足是否接近
+    if (containVectors.length > 0) {
+      // 若已有交点则判断两线交点是否与原垂足距离较近
+      let p = vectorsCrossPoint(vector, nearVectors[nearVectors.length - 1]);
+      // 若交点距离现有垂足过远则忽略该交点
+      if (distanceBetweenPoints(p, nearPoint) <= near) {
+        nearPoint = p;
+        nearVectors.push(vector);
+      }
+      continue;
+    }
+    // 如果当前没有交点
+    if (nearPoint.length === 0) {
+      nearPoint = cross;
+      nearVectors.push(vector);
+      continue;
+    }
+    // 若已有交点则判断两线交点是否与原垂足距离较近
+    let p = vectorsCrossPoint(vector, nearVectors[nearVectors.length - 1]);
+    // 若交点距离现有垂足过远则忽略该交点
+    if (distanceBetweenPoints(p, nearPoint) <= near) {
+      nearPoint = p;
+      nearVectors.push(vector);
     }
   }
   return { nearVectors, nearPoint };
@@ -148,10 +210,10 @@ function checkPointNearVectors(point, vectors, near) {
  */
 function checkPointOnSegment(point, vector) {
   // 是否与端点接近
-  if (distanceBetweenPoints(vector[0], point) < 0.000001) {
+  if (distanceBetweenPoints(vector[0], point) < 0.0001) {
     return true;
   }
-  if (distanceBetweenPoints(vector[1], point) < 0.000001) {
+  if (distanceBetweenPoints(vector[1], point) < 0.0001) {
     return true;
   }
   let v1 = [point[0] - vector[0][0], point[1] - vector[0][1]];
@@ -162,11 +224,11 @@ function checkPointOnSegment(point, vector) {
     return false;
   }
   // 若线段垂直或平行仅判断点是否在一个方向的区间内
-  if (Math.abs(vector[0][0] - vector[1][0]) < 0.000001) {
+  if (Math.abs(vector[0][0] - vector[1][0]) < 0.0001) {
     return (Math.min(vector[0][1], vector[1][1]) <= point[1])
       && (Math.max(vector[0][1], vector[1][1]) >= point[1]);
   }
-  if (Math.abs(vector[0][1] - vector[1][1]) < 0.000001) {
+  if (Math.abs(vector[0][1] - vector[1][1]) < 0.0001) {
     return (Math.min(vector[0][0], vector[1][0]) <= point[0])
       && (Math.max(vector[0][0], vector[1][0]) >= point[0]);
   }
@@ -184,6 +246,13 @@ function checkPointOnSegment(point, vector) {
  * @returns 距离和点到直线的垂足
  */
 function distanceBetweenPointLine(point, vector) {
+  // 是否与端点接近
+  if (distanceBetweenPoints(vector[0], point) < 1) {
+    return { distance: distanceBetweenPoints(vector[0], point), cross: vector[0] };
+  }
+  if (distanceBetweenPoints(vector[1], point) < 1) {
+    return { distance: distanceBetweenPoints(vector[1], point), cross: vector[1] };
+  }
   const { A, B, C } = generateLineEquation(vector);
   const div = A ** 2 + B ** 2;
   const distance = Math.abs(A * point[0] + B * point[1] + C) / Math.sqrt(div);
@@ -211,11 +280,36 @@ function vectorsCrossPoint(v1, v2) {
   let va = [v1[1][0] - v1[0][0], v1[1][1] - v1[0][1]];
   let vb = [v2[1][0] - v2[0][0], v2[1][1] - v2[0][1]];
   let div = crossProduct(va, vb);
-  if (div === 0) {
+  if (Math.abs(div) < 0.001) {
     return [];
   }
   let t = (crossProduct(b1, vb) - crossProduct(a1, vb)) / div;
   return [a1[0] + va[0] * t, a1[1] + va[1] * t];
+}
+
+/**
+ * 求两条线段的交点
+ * 没有则返回 []
+ * @param {线段1} seg1 
+ * @param {线段2} seg2 
+ */
+function segmentIntersect(seg1, seg2) {
+  let p = seg1[0];
+  let r = [seg1[1][0] - seg1[0][0], seg1[1][1] - seg1[0][1]];
+  let q = seg2[0];
+  let s = [seg2[1][0] - seg2[0][0], seg2[1][1] - seg2[0][1]];
+  let denom = r[0] * s[1] - r[1] * s[0];
+  if (Math.abs(denom) < 0.001) {
+    return [];
+  }
+  let t = ((q[0] - p[0]) * s[1] - (q[1] - p[1]) * s[0]) / denom;
+  let u = ((q[0] - p[0]) * r[1] - (q[1] - p[1]) * r[0]) / denom;
+  if ((t < 0 || t > 1) || (u < 0 || u > 1)) {
+    return [];
+  }
+  let x = p[0] + t * r[0];
+  let y = p[1] + t * r[1];
+  return [x, y];
 }
 
 /**
@@ -225,7 +319,7 @@ function vectorsCrossPoint(v1, v2) {
  * @returns 是否相等
  */
 function judgePointEqual(p1, p2) {
-  return p1[0] === p2[0] && p1[1] === p2[1];
+  return Math.abs(p1[0] - p2[0]) < 0.0001 && Math.abs(p1[1] - p2[1]) < 0.0001;
 }
 
 /**
@@ -303,6 +397,8 @@ export default {
   getPointAngleDegree,
   judgePointEqual,
   vectorsCrossPoint,
+  segmentIntersect,
+  judgePointEqual,
 
   createEqualDistPoint,
   judgeClockwise,

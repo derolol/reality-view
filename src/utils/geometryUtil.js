@@ -1,6 +1,7 @@
 import clipperUtil from "./clipperUtil";
 import toolUtil from "./toolUtil";
-import { Shape, Path } from "three";
+import { Shape, Path, ExtrudeGeometry, LineCurve3, Vector3, Object3D } from "three";
+import mathUtil from "./mathUtil";
 
 /**
  * 获取点集包含的向量集
@@ -63,7 +64,7 @@ function generateWallCoordinates(wallCoordinates, wallInsideCoordinates, wallThi
     areaCoordinates = clipperUtil.coordinatesPolygonClipper(
       areaMainCoordinates,
       wallClipper,
-      "different"
+      "diff"
     );
   }
   // 当前area即为主area
@@ -76,7 +77,7 @@ function generateWallCoordinates(wallCoordinates, wallInsideCoordinates, wallThi
   shapeCoordinates = clipperUtil.coordinatesPolygonClipper(
     wallCoordinates,
     areaCoordinates,
-    "different"
+    "diff"
   );
   return { areaMainCoordinates, areaCoordinates, shapeCoordinates };
 }
@@ -126,6 +127,66 @@ function generatePolygonShape(shape, polygon) {
     }
     shape.holes.push(path);
   }
+}
+
+/**
+ * 根据点生成其连通平面的ExtrudeGeometry
+ * @param {中心点集} points
+ * @returns THREE ExtrudeGeometry
+ */
+function getGeometryByCenterPoint(points, levels, setting) {
+  let rotate = 0;
+  let distance = Math.sqrt((points[0][0] - points[1][0]) ** 2 + (points[0][1] - points[1][1]) ** 2);
+  // 获取中心两点
+  let shapePoints = toolUtil.arraySimpleDeepCopy(points);
+  let z = toolUtil.arraySimpleDeepCopy(levels);
+  if (levels[0] > levels[1]) {
+    shapePoints.reverse();
+    z.reverse();
+  }
+  // 通过距离计算目标点
+  let x1 = shapePoints[0][0];
+  let x2 = shapePoints[0][0] + distance;
+  let z1 = z[0];
+  let z2 = z[1];
+  // 获取竖直平面四点
+  let halfWidth = 1;
+  let bottomShapePoints = [
+    [x1 - halfWidth, z1],
+    [x1 + halfWidth, z1],
+    [x2 + halfWidth, z2],
+    [x2 - halfWidth, z2],
+    [x1 - halfWidth, z1],
+  ];
+  // 构建 Shape
+  let shape = new Shape();
+  for (let i = 0, len = bottomShapePoints.length; i < len; i++) {
+    if (i === 0) {
+      shape.moveTo(bottomShapePoints[i][0], bottomShapePoints[i][1]);
+      continue;
+    }
+    shape.lineTo(bottomShapePoints[i][0], bottomShapePoints[i][1]);
+  }
+  // 构建 Geometry
+  let geometry = new ExtrudeGeometry(shape, Object.assign(setting, {
+    depth: halfWidth * 2,
+  }));
+  // 计算形状中心点
+  geometry.center();
+  // 旋转形状
+  geometry.rotateX(Math.PI / 2);
+  // 若点不在竖直方向重合，需要计算其方向
+  if (shapePoints[0][0] !== shapePoints[1][0] || shapePoints[0][1] !== shapePoints[1][1]) {
+    rotate = Math.atan2(shapePoints[1][1] - shapePoints[0][1], shapePoints[1][0] - shapePoints[0][0]);
+  }
+  geometry.rotateZ(rotate);
+  // 设置形状位置
+  geometry.translate(
+    (shapePoints[0][0] + shapePoints[1][0]) / 2,
+    (shapePoints[0][1] + shapePoints[1][1]) / 2,
+    (z1 + z2) / 2
+  );
+  return geometry;
 }
 
 /**
@@ -265,27 +326,132 @@ function areaCoordinatesListCompare(c1, c2) {
   let len2 = c2.length;
   let newAreaList = [];
   let deleteAreaIdList = [];
+  // 若功能区列表均未完成遍历
   while (i < len1 && j < len2) {
+    // 获取功能区的差值
     let score = areaCoordinatesMinus(c1[i].coordinates, c2[j]);
+    // 新旧值相等
     if (score === 0) {
       i++;
       j++;
-    } else if (score < 0) {
+    }
+    // 旧值小于新值
+    else if (score < 0) {
       deleteAreaIdList.push(c1[i].area_id);
       i++;
-    } else if (score > 0) {
+    }
+    // 旧值大于新值
+    else if (score > 0) {
       newAreaList.push(c2[j]);
       j++;
       continue;
     }
   }
+  // 旧值功能区列表未完成遍历
   while (i < len1) {
     deleteAreaIdList.push(c1[i++].area_id);
   }
+  // 新值功能区列表未完成遍历
   while (j < len2) {
     newAreaList.push(c2[j++]);
   }
+  // 返回需要删除的功能区以及新增的功能区
   return { deleteAreaIdList, newAreaList };
+}
+
+/**
+ * 处理存在覆盖部分的线段
+ */
+function cleanOverlapSegments(segments) {
+  let resultSegments = [];
+  // 将相同斜率的线段分为一组
+  let kMap = {};
+  for (let s of segments) {
+    let k = 0;
+    if (Math.abs(s[0][0] - s[1][0]) < 0.000001) {
+      k = Infinity;
+    } else {
+      k = (s[1][1] - s[0][1]) / (s[1][0] - s[0][0]);
+    }
+    k = Math.round(k * 100) / 100;
+    if (!kMap.hasOwnProperty(k)) {
+      kMap[k] = [];
+    }
+    kMap[k].push(s);
+  }
+  // 遍历各个斜率组
+  for (let k in kMap) {
+    let segments = kMap[k];
+    if (segments.length <= 1) {
+      resultSegments.push(...segments.map(s => [s]));
+      continue;
+    }
+    let i = 0;
+    let j = 1;
+    while (segments.length > 1) {
+      // 获取 l1 和 l2 保证 l1 > l2
+      let l1 = segments[i];
+      let l2 = segments[j];
+      let l1d = mathUtil.distanceBetweenPoints(l1[0], l1[1]);
+      let l2d = mathUtil.distanceBetweenPoints(l2[0], l2[1]);
+      if (l1d < l2d) {
+        l1 = segments[j];
+        l2 = segments[i];
+        let temp = l1d;
+        l1d = l2d;
+        l2d = temp;
+      }
+      // 构造判断线段端点p
+      let p = null;
+      let lc1 = mathUtil.distanceBetweenPoints(l1[0], [(l2[0][0] + l2[1][0]) / 2, (l2[0][1] + l2[1][1]) / 2]);
+      let lc2 = mathUtil.distanceBetweenPoints(l1[1], [(l2[0][0] + l2[1][0]) / 2, (l2[0][1] + l2[1][1]) / 2]);
+      if (lc1 > lc2) {
+        p = [l1[0][0], l1[0][1]];
+      }
+      else {
+        p = [l1[1][0], l1[1][1]];
+      }
+      // 构造判断线段端点q
+      let q = null;
+      let lp1 = mathUtil.distanceBetweenPoints(p, l2[0]);
+      let lp2 = mathUtil.distanceBetweenPoints(p, l2[1]);
+      if (lp1 > lp2) {
+        q = [l2[0][0], l2[0][1]];
+      }
+      else {
+        q = [l2[1][0], l2[1][1]];
+      }
+      // 判断line1、line2、pq是否三线共线
+      let pq = [p, q];
+      if (mathUtil.crossProduct([l1[0][0] - l1[1][0], l1[0][1] - l1[1][1]], [pq[0][0] - pq[1][0], pq[0][1] - pq[1][1]]) === 0) {
+        // 若 pq < line1 + line2
+        let pqd = mathUtil.distanceBetweenPoints(p, q);
+        // 判断 line1 是否包含 line2
+        if (pqd <= l1d + l2d + 0.000001) {
+          if (pqd < l1d) {
+            pq = toolUtil.arraySimpleDeepCopy(l1);
+          }
+          // 用 pq 替换 line1、line2
+          segments.splice(j, 1);
+          segments.splice(i, 1);
+          segments.push(pq);
+          i = 0;
+          j = 1;
+          continue;
+        }
+      }
+      j += 1;
+      // 若线段与所有同斜率的线段都不存在相交的关系则添加到目标向量中
+      if (j === segments.length) {
+        resultSegments.push([toolUtil.arraySimpleDeepCopy(segments[0])]);
+        segments.splice(0, 1);
+        i = 0;
+        j = 1;
+      }
+    }
+    resultSegments.push([toolUtil.arraySimpleDeepCopy(segments[0])]);
+  }
+  return resultSegments;
 }
 
 export default {
@@ -300,6 +466,9 @@ export default {
 
   getShapeByCoordinates,
   generateSceneFunc,
+  getGeometryByCenterPoint,
 
   generateGeoJSONGeometry,
+
+  cleanOverlapSegments,
 }

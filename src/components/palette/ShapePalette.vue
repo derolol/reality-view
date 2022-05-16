@@ -1,13 +1,20 @@
 <template>
-  <div class="palette" :style="paletteFullScreen">
+  <div
+    class="palette"
+    :style="paletteFullScreen"
+  >
     <el-row class="palette-container">
       <!-- 
 
         绘图工具栏
 
        -->
-      <el-col class="palette-tool" :span="6">
+      <el-col
+        class="palette-tool"
+        :span="6"
+      >
         <shape-tool-tab
+          ref="toolTab"
           :disabledList="disabledList"
           :allowShapeBool="allowShapeBool"
           @shapeItemClick="handleShapeItemClick"
@@ -19,8 +26,14 @@
         绘图展示
 
       -->
-      <el-col class="palette-view" :span="18">
-        <div id="paletteCanvas" class="palette-canvas">
+      <el-col
+        class="palette-view"
+        :span="18"
+      >
+        <div
+          id="paletteCanvas"
+          class="palette-canvas"
+        >
           <basic-palette
             ref="palette"
             :canvasWidth="canvasWidth"
@@ -40,7 +53,8 @@
 import fullScreenMixin from "../FullScreenMixin.vue";
 import ShapeToolTab from "./ShapeToolTab.vue";
 import BasicPalette from "./BasicPalette.vue";
-import toolUtil from "@/store/toolUtil";
+import toolUtil from "@/utils/toolUtil";
+import geometryUtil from "@/utils/geometryUtil";
 
 export default {
   name: "palette",
@@ -53,9 +67,25 @@ export default {
       drawMode: "building",
 
       disabledList: ["line", "multi-line", "regular-polygon"],
-      buildingDisabledList: ["line", "multi-line", "regular-polygon"],
-      floorDisabledList: ["line", "multi-line", "regular-polygon"],
-      wallDisabledList: ["rectangle", "regular-polygon", "polygon"],
+      buildingDisabledList: [
+        "line",
+        "multi-line",
+        "multi-line",
+        "regular-polygon",
+      ],
+      floorDisabledList: [
+        "line",
+        "multi-line",
+        "multi-line",
+        "regular-polygon",
+      ],
+      wallDisabledList: [
+        "line",
+        "multi-line",
+        "rectangle",
+        "regular-polygon",
+        "polygon",
+      ],
 
       allowShapeBool: true,
 
@@ -77,10 +107,25 @@ export default {
     );
   },
   activated() {
-    this.allowShapeBool = true;
+    // 重置布尔运算选择类型
+    this.$refs.toolTab.currentShapeMode = "single";
+    this.shapeMode = "single";
+
+    // 根据绘制模式初始化画板
     let drawMode = this.$route.params.drawMode;
     if (drawMode !== null && typeof drawMode === "string") {
       this.drawMode = drawMode;
+      // 当处于建筑绘制模式时
+      if (drawMode === "building") {
+        this.allowShapeBool = true;
+        // 设置当前不能使用的功能
+        this.disabledList.splice(
+          0,
+          this.disabledList.length,
+          ...this.buildingDisabledList
+        );
+        return;
+      }
       // 当处于楼层绘制模式时
       if (drawMode === "floor") {
         this.allowShapeBool = true;
@@ -127,6 +172,15 @@ export default {
           mapId,
           floorId
         );
+        // 设置画板的大小
+        let box = geometryUtil.getCoordinatesBox(wallGeometry.coordinates);
+        console.log(box);
+        let width = Math.max(Math.abs(box.x), Math.abs(box.x + box.width)) * 2;
+        let height =
+          Math.max(Math.abs(box.y), Math.abs(box.y + box.height)) * 2;
+        this.$refs.palette.canvasShowWidth = Math.floor(width / 100 + 1) * 100;
+        this.$refs.palette.canvasShowHeight =
+          Math.floor(height / 100 + 1) * 100;
       }
     }
   },
