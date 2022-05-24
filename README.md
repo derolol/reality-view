@@ -11,7 +11,7 @@ npm run serve
 ```
 
 ### Compiles and minifies for production
-```
+```U<OTOpEOE2<q
 npm run build
 ```
 
